@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kanu</title>
+<link rel="icon" type="image/png" href="/static/icon.png?v=6">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <div class="brand" id="brand" title="Acerca de Kanu"><img src="/static/icon.png?v=6" alt=""><span>Kanu</span></div>
+  <button id="btnSide" class="ghost small side-btn icon" title="Achicar o agrandar la lista de videos (tecla B)"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg></button>
+  <div class="hdr-actions">
+    <button id="batchPill" class="batch-pill hidden" title="Ver el avance de la tanda"><img src="/static/icon.png?v=6" alt=""><span id="batchPillTxt"></span></button>
+    <button id="btnBatch" class="primary" title="Sube videos nuevos y Kanu los deja listos para stock"><svg class="ic" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg> Subir</button>
+    <button id="btnAutoAll" class="ghost" title="Corrige automáticamente los clips que no ajustaste a mano ni aprobaste">✦ Corregir todo</button>
+    <button id="btnJobs" class="ghost">Cola <span id="jobsBadge" class="badge hidden">0</span></button>
+    <button id="btnExport" class="accent">Exportar…</button>
+    <button id="btnSettings" class="ghost icon" title="Ajustes: mi estilo de color"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+  </div>
+</header>
+
+<main>
+  <aside id="clipList" class="clips"></aside>
+
+  <section class="viewer">
+    <div class="stage" id="stage">
+      <canvas id="view"></canvas>
+      <div id="wipe" class="wipe"><div class="wipe-handle"></div></div>
+      <div id="loading" class="loading hidden">Cargando…</div>
+      <div id="playFlash" class="play-flash"></div>
+      <div id="cropMark" class="crop-mark hidden"></div>
+      <div id="straightGrid" class="straight-grid hidden"></div>
+      <svg id="spotLayer" class="spot-layer hidden" preserveAspectRatio="none"></svg>
+      <svg id="lineLayer" class="line-layer hidden"><line id="line" x1="-1" y1="0" x2="-1" y2="0"/></svg>
+      <div class="tag left" id="tagBefore">Antes</div>
+      <div class="tag right" id="tagAfter">Después</div>
+    </div>
+
+    <div class="toolbar">
+      <div class="seg" id="viewMode">
+        <button data-mode="after" class="on">Después</button>
+        <button data-mode="split">Dividido</button>
+        <button data-mode="before">Antes</button>
+      </div>
+      <button id="btnNoise" class="ghost small"><svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></svg> Ruido al 100%</button>
+      <div class="spacer"></div>
+      <span class="time" id="timeLabel">0:00.0 / 0:00.0</span>
+    </div>
+
+    <div class="sec-bar hidden" id="secBar" title="Clic en un tramo: usarlo o descartarlo"></div>
+    <div class="timeline" id="timeline">
+      <div class="trim-zone" id="trimZone"></div>
+      <div id="segMarks"></div>
+      <input type="range" id="scrub" min="0" max="1000" value="400">
+    </div>
+    <div class="toolbar sub">
+      <div class="transport">
+        <button id="tpStart" class="tp" title="Ir al inicio (tecla Inicio)"><svg class="ic" viewBox="0 0 24 24"><path d="M6 5v14"/><path d="M18 6 9.5 12 18 18z"/></svg></button>
+        <button id="tpBack" class="tp" title="Atrás 5 s (J)"><svg class="ic big" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v4h4"/><text x="12" y="15.6" text-anchor="middle" class="n">5</text></svg></button>
+        <button id="tpPlay" class="tp-play" title="Reproducir / pausar (Espacio o clic en el video)"></button>
+        <button id="tpFwd" class="tp" title="Adelante 5 s (L)"><svg class="ic big" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v4h-4"/><text x="12" y="15.6" text-anchor="middle" class="n">5</text></svg></button>
+        <span class="tp-sep"></span>
+        <button id="tpLoop" class="tp toggle" title="Repetir"><svg class="ic" viewBox="0 0 24 24"><path d="M17 2l3 3-3 3"/><path d="M4 11V9a4 4 0 0 1 4-4h12"/><path d="M7 22l-3-3 3-3"/><path d="M20 13v2a4 4 0 0 1-4 4H4"/></svg></button>
+        <button id="tpMute" class="tp toggle" title="Sonido"></button>
+      </div>
+      <span id="tpState" class="hint"></span>
+      <div class="spacer"></div>
+      <div class="tool-group"><button id="btnCut" class="ghost small" title="Divide el clip en este punto (tecla C)"><svg class="ic" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/></svg> Cortar aquí</button>
+      <button id="btnCutClear" class="ghost small hidden" title="Quita todos los cortes">Quitar cortes</button>
+      <button id="btnIn" class="ghost small" title="Tecla I">⇤ Entrada</button>
+      <button id="btnOut" class="ghost small" title="Tecla O">Salida ⇥</button>
+      <button id="btnTrimClear" class="ghost small">Quitar recorte</button></div>
+      <button id="btnKeys" class="ghost small icon" title="Atajos: Espacio o K reproduce · J / L 5 s · ← → 1 s · Shift+← → 0.1 s · I entrada · O salida · C cortar · B lista"><svg class="ic" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></button>
+    </div>
+
+    <div id="noisePanel" class="noise-panel hidden">
+      <div class="noise-head">
+        <strong>Ruido al 100%</strong>
+        <span class="hint">Haz clic en la imagen de arriba para elegir la zona (mejor una zona oscura y lisa)</span>
+        <div class="spacer"></div>
+        <button id="btnNoiseClose" class="ghost small">Cerrar</button>
+      </div>
+      <div class="noise-grid">
+        <figure><canvas id="cropA"></canvas><figcaption>Original</figcaption></figure>
+        <figure><canvas id="cropB"></canvas><figcaption id="cropBLabel">Con reducción</figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <aside class="panel" id="panel">
+    <div class="clip-title"><span id="clipName">—</span><span id="clipStatus" class="status"></span>
+      <div class="spacer"></div>
+      <button id="btnUndo" class="ghost small icon" title="Deshacer (⌘Z / Ctrl+Z)" disabled><svg class="ic" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+      <button id="btnRedo" class="ghost small icon" title="Rehacer (⇧⌘Z / Ctrl+Y)" disabled><svg class="ic" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
+    </div>
+    <div class="row-btns">
+      <button id="btnAuto" class="accent">✦ Auto</button>
+      <button id="btnReset" class="ghost">Restablecer</button>
+      <button id="btnApprove" class="ghost">✓ Aprobar</button>
+    </div>
+    <div class="row-btns">
+      <button id="btnCopy" class="ghost small">Copiar ajustes</button>
+      <button id="btnPaste" class="ghost small" disabled>Pegar</button>
+      <button id="btnPasteAll" class="ghost small">Aplicar a todos</button>
+    </div>
+    <div id="autoWhy" class="why hidden"></div>
+
+    <h3 class="h3-row">Enderezar <button id="btnRotAuto" class="accent small" title="Claude mide la inclinación con las líneas de la imagen">✦ Auto</button></h3>
+    <div class="sl">
+      <div class="sl-top"><span>Ángulo</span><span class="v" id="v_rotate"></span></div>
+      <input type="range" id="s_rotate" min="-15" max="15" step="0.1">
+    </div>
+    <div class="row-btns">
+      <button id="btnLine" class="ghost small" title="Traza una línea sobre el horizonte, un edificio o un poste"><svg class="ic" viewBox="0 0 24 24"><path d="M3 20 21 4"/><circle cx="3.5" cy="19.5" r="1.5"/><circle cx="20.5" cy="4.5" r="1.5"/></svg> Trazar línea recta</button>
+      <button id="btnRotM" class="ghost small" title="Girar 0.1° antihorario">↶ 0.1°</button>
+      <button id="btnRotP" class="ghost small" title="Girar 0.1° horario">0.1° ↷</button>
+      <button id="btnRot0" class="ghost small">0°</button>
+    </div>
+    <div id="rotInfo" class="hint"></div>
+
+    <h3>Manchas del sensor</h3>
+    <button id="btnSpot" class="ghost" title="Haz clic sobre una mancha de polvo y Kanu la borra en todo el video">◎ Marcar mancha</button>
+    <div id="spotList" class="spot-list"></div>
+    <div id="spotInfo" class="hint"></div>
+
+    <h3>Luz</h3>
+    <div id="slLight"></div>
+    <h3>Color</h3>
+    <div id="slColor"></div>
+
+    <h3>Ruido</h3>
+    <div class="field">
+      <select id="denoise"></select>
+      <span id="noiseMeasure" class="hint"></span>
+    </div>
+    <div id="dnPreview" class="hint"></div>
+
+    <h3>Cortes para stock</h3>
+    <label class="check"><input type="checkbox" id="segOn"> Sacar el máximo de clips</label>
+    <div class="field">
+      <span>Duración</span>
+      <input type="number" id="segMin" min="5" max="60" step="1"> a
+      <input type="number" id="segMax" min="5" max="60" step="1"> s
+    </div>
+    <div class="field">
+      <span>Ralentizar</span>
+      <select id="segSlow">
+        <option value="1">Nunca</option>
+        <option value="1.2">Hasta 1.2× (sale a 50p)</option>
+        <option value="2">Hasta 2× (sale a 29.97p)</option>
+      </select>
+    </div>
+    <div id="segInfo" class="seg-info"></div>
+
+    <h3>Estabilización</h3>
+    <div class="field"><span>Nivel</span><select id="stabLevel"></select></div>
+    <div class="field"><span>Método</span><select id="stabMethod"></select></div>
+    <div id="stabInfo" class="hint"></div>
+    <button id="btnStabPreview" class="ghost small hidden">▶ Comparar antes / después</button>
+    <div id="stabBar" class="job-bar hidden"><div></div></div>
+  </aside>
+</main>
+
+<div id="batchModal" class="modal hidden">
+  <div class="modal-box batch-box">
+    <div class="modal-foot top"><h2>Subir videos</h2><div class="spacer"></div><span id="batchState" class="hint"></span></div>
+
+    <div id="batchProgress" class="batch-progress hidden">
+      <img src="/static/icon.png?v=6" alt="" class="bp-icon">
+      <div class="bp-title" id="bpTitle">Subiendo videos…</div>
+      <div class="bp-stage hint" id="bpStage"></div>
+      <div class="bp-bar"><div id="bpBar"></div></div>
+      <div class="bp-detail hint" id="bpDetail"></div>
+      <div class="bp-error hidden" id="bpError"></div>
+      <div class="bp-actions">
+        <button id="bpHide" class="ghost">Seguir trabajando mientras tanto</button>
+        <button id="bpDone" class="primary hidden">Ver resultados</button>
+        <button id="bpBack" class="ghost hidden">Volver</button>
+      </div>
+    </div>
+    <div id="batchForm">
+    <label id="dropZone" class="drop-zone">
+      <input type="file" id="batchFiles" multiple accept="video/*,.mp4,.mov,.mxf,.m4v" hidden>
+      <div class="dz-icon">⇪</div>
+      <div><b>Arrastra aquí tus videos</b> o haz clic para elegirlos</div>
+      <div class="hint">Se copian a Videos/ · los originales nunca se modifican</div>
+    </label>
+    <div id="batchList" class="batch-list"></div>
+
+    <div class="batch-grid">
+      <div>
+        <h3>Nombre de la tanda</h3>
+        <input type="text" id="batchTitle" placeholder="Ej.: Monserrate con neblina">
+        <h3>Opciones</h3>
+        <div id="batchOpts" class="batch-opts"></div>
+        <div class="field"><span>Clips de</span>
+          <input type="number" id="batchMin" min="5" max="60" value="12"> a
+          <input type="number" id="batchMax" min="5" max="60" value="14"> s</div>
+      </div>
+      <div>
+        <h3>Nota para Claude <span class="hint">(opcional)</span></h3>
+        <textarea id="batchNote" rows="6" placeholder="Lo que no cabe en las opciones. Ej.: el tercero tiene un golpe en el segundo 8 · la neblina era así, no la limpies · prioriza el C0412"></textarea>
+        <p class="hint">Kanu aplica las opciones solo. La nota queda guardada con la tanda y aparece en la corrección de cada clip; Claude la lee cuando revisa o rehace la tanda.</p>
+      </div>
+    </div>
+
+    <div class="modal-foot">
+      <span id="batchSummary" class="hint"></span>
+      <div class="spacer"></div>
+      <button id="batchCancel" class="ghost">Cerrar</button>
+      <button id="batchUpload" class="ghost">Solo subir</button>
+      <button id="batchGo" class="primary">Subir y procesar</button>
+    </div>
+    </div>
+  </div>
+</div>
+<div id="settingsModal" class="modal hidden">
+  <div class="modal-box settings-box">
+    <div class="modal-foot top"><h2>Ajustes</h2><div class="spacer"></div><button id="setClose" class="ghost small">Cerrar</button></div>
+
+    <section class="set-sec">
+      <h3>Mi estilo de color</h3>
+      <p class="hint">Lo que mejor enseña tu estilo es <b>el original junto a tu versión editada</b> (mismo nombre):
+        Kanu ve exactamente qué cambiaste. Si solo tienes los editados, súbelos igual: Kanu toma lo que se repite
+        en todos (negros, contraste, saturación). Y cada clip que ajustas a mano aquí en Kanu también cuenta.</p>
+      <div class="set-drops">
+        <label class="drop-zone small" data-dest="estilo_original"><input type="file" multiple accept="video/*,.mp4,.mov,.mxf,.m4v" hidden>
+          <div class="dz-icon">⇪</div><b>Originales</b><span class="hint">sin editar, como salen de la cámara</span></label>
+        <label class="drop-zone small" data-dest="estilo_editado"><input type="file" multiple accept="video/*,.mp4,.mov,.mxf,.m4v" hidden>
+          <div class="dz-icon">⇪</div><b>Editados por ti</b><span class="hint">tu versión final, mismo nombre</span></label>
+      </div>
+      <div id="setUpload" class="hint"></div>
+      <div id="setPairs" class="set-pairs"></div>
+      <div class="set-learn">
+        <button id="setLearn" class="primary">✦ Aprender mi estilo</button>
+        <div class="set-learn-info"><div id="setLearnTxt" class="hint"></div><div class="bp-bar hidden" id="setLearnBar"><div></div></div></div>
+      </div>
+      <div class="set-kanu">
+        <label class="switch"><input type="checkbox" id="setKanu"><span></span>Aprender también de mis ajustes en Kanu</label>
+        <div id="setKanuTxt" class="hint"></div>
+      </div>
+      <label class="switch"><input type="checkbox" id="setEnabled"><span></span>Usar mi estilo en la corrección automática</label>
+    </section>
+
+    <section class="set-sec">
+      <h3>Mi LUT <span class="hint">(opcional)</span></h3>
+      <p class="hint">Si tienes un preset o LUT exportado como <b>.cube</b> (Lightroom, Premiere, DaVinci), Kanu lo aplica
+        después de su corrección, en el visor y al exportar.</p>
+      <div class="set-lut">
+        <label class="drop-zone small inline" data-dest="estilo_lut"><input type="file" accept=".cube" hidden>
+          <b id="setLutName">Subir .cube</b></label>
+        <label class="switch"><input type="checkbox" id="setLut"><span></span>Aplicar mi LUT</label>
+      </div>
+    </section>
+
+    <section class="set-sec danger">
+      <h3>Empezar de cero</h3>
+      <p class="hint">Borra tus pares, lo aprendido y tu LUT (por ejemplo, para regalar Kanu). Tus videos de trabajo no se tocan.</p>
+      <button id="setWipe" class="ghost danger-btn">Borrar todo mi estilo</button>
+    </section>
+  </div>
+</div>
+<div id="iconModal" class="modal hidden" title="Clic para cerrar">
+  <div class="icon-view">
+    <img src="/static/icon.png?v=6" alt="Icono de Kanu">
+    <div class="icon-text">
+      <h1>Kanu</h1>
+      <p class="tagline">Tú sales a grabar. Kanu se encarga del resto.</p>
+      <p>Un tucán con buen ojo y pulso de cirujano: endereza el horizonte, calma el temblor de la mano,
+        limpia el ruido y le devuelve a cada toma su color natural, sin filtros de película.</p>
+      <p>Después corta el video en clips de 12 a 14 segundos, ralentiza lo justo para sacar uno más
+        y lo entrega en 4K, listo para venderse en los bancos de stock.</p>
+      <div class="chips"><span>Endereza</span><span>Estabiliza</span><span>Colorea</span><span>Corta</span><span>Exporta 4K</span></div>
+      <p class="sign">Dibujado a plumilla, hecho a pico.</p>
+    </div>
+  </div>
+</div>
+<div id="exportModal" class="modal hidden">
+  <div class="modal-box">
+    <h2>Exportar</h2>
+    <div class="cols">
+      <div>
+        <h3>Clips</h3>
+        <div class="row-btns">
+          <button class="ghost small" id="exAll">Todos</button>
+          <button class="ghost small" id="exApproved">Aprobados</button>
+          <button class="ghost small" id="exNone">Ninguno</button>
+        </div>
+        <div id="exClips" class="ex-list"></div>
+      </div>
+      <div>
+        <h3>Formatos</h3>
+        <div id="exPresets" class="ex-list"></div>
+        <label class="check"><input type="checkbox" id="exAudio"> Incluir audio</label>
+        <label class="check"><input type="checkbox" id="exUpload" checked> Versión final para subir</label>
+        <p class="hint">Marcado: se guardan en <b>videos subir/</b> con el nombre del clip (C0253.mp4).<br>Sin marcar: pruebas en <b>Exportados/&lt;formato&gt;/</b>. Los originales no se tocan.</p>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <span id="exSummary" class="hint"></span>
+      <div class="spacer"></div>
+      <button class="ghost" id="exCancel">Cancelar</button>
+      <button class="primary" id="exGo">Exportar</button>
+    </div>
+  </div>
+</div>
+
+<div id="stabModal" class="modal hidden">
+  <div class="modal-box wide">
+    <div class="modal-foot top">
+      <h2>Estabilización: antes y después</h2>
+      <span id="cmpLabel" class="hint"></span>
+      <div class="spacer"></div>
+      <button class="ghost small" id="cmpClose">✕</button>
+    </div>
+    <div class="cmp-stage" id="cmpStage">
+      <video id="cmpVideo" muted loop playsinline controls></video>
+      <div class="cmp-grid hidden" id="cmpGrid"></div>
+      <div class="tag left">Original</div>
+      <div class="tag right" style="right:auto;left:calc(50% + 10px)">Estabilizado</div>
+    </div>
+    <div class="modal-foot">
+      <label class="check"><input type="checkbox" id="cmpGridOn" checked> Cuadrícula (ayuda a ver la vibración)</label>
+      <div class="seg" id="cmpRate">
+        <button data-r="0.5">0.5×</button><button data-r="1" class="on">1×</button>
+      </div>
+      <div class="spacer"></div>
+      <span class="hint">El estabilizado se ve un poco más cerrado: recorta ~10 % para ocultar los bordes.</span>
+    </div>
+  </div>
+</div>
+
+<div id="jobsDrawer" class="drawer hidden">
+  <div class="drawer-head">
+    <strong>Cola de exportación</strong>
+    <div class="spacer"></div>
+    <button class="ghost small" id="jbOpen">Abrir carpeta</button>
+    <button class="ghost small" id="jbClear">Limpiar terminados</button>
+    <button class="ghost small" id="jbCancel">Cancelar pendientes</button>
+    <button class="ghost small" id="jbCache" title="Borra los intermedios estabilizados y fotogramas temporales">Liberar espacio</button>
+    <button class="ghost small" id="jbClose">✕</button>
+  </div>
+  <div id="jobsList"></div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

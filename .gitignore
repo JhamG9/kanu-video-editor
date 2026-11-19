@@ -1,0 +1,26 @@
+# Datos del usuario (videos, finales, ajustes, estilo aprendido): nunca van al repositorio
+/Videos/
+/videos subir/
+/Exportados/
+/ajustes/
+/estilo/
+/tandas/
+/.cache/
+/Kanu.app/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node / builds (fases siguientes)
+node_modules/
+dist/
+out/
+
+# Sistema
+.DS_Store
+.claude/
