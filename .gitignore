@@ -33,3 +33,7 @@ out/
 # Sistema
 .DS_Store
 .claude/
+
+# Instalador (se publica en GitHub Releases, no en el repo)
+/build/
+*.dmg

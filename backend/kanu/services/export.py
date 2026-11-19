@@ -42,7 +42,7 @@ class Exporter:
                         job = {"id": f"{time.time():.6f}-{len(self.jobs)}", "clip": name, "preset": pk,
                                "label": P["label"], "segment": i + 1, "of": len(segs), "a": a, "b": b,
                                "speed": plan[i]["speed"], "fps_raw": plan[i]["fps_raw"],
-                               "out": str(out.relative_to(config.ROOT)), "status": "en cola", "progress": 0.0,
+                               "out": str(out.relative_to(config.DATA)), "status": "en cola", "progress": 0.0,
                                "error": None, "settings": dict(s), "meta": m, "audio": keep_audio}
                         self.jobs.append(job)
                         added.append(job["id"])
@@ -94,7 +94,7 @@ class Exporter:
             elif clean:
                 src = clean
                 job.update(status="procesando", progress=0.0, stage=None)
-            out = config.ROOT / job["out"]
+            out = config.DATA / job["out"]
             tmp = out.with_name(out.stem + ".parcial" + out.suffix)
             cube = previews.cube_for(job["settings"])
             cmd = ff.export_cmd(src, tmp, job["a"], job["b"], job["preset"], cube, job["settings"], job["meta"],

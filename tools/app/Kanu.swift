@@ -1,7 +1,10 @@
 // Kanu.app: ventana nativa (WKWebView) para el editor web de Kanu.
-// Vive en la raíz del repositorio. La primera vez crea el entorno de Python (backend/.venv);
-// arranca el motor si no está corriendo y lo apaga al cerrar si lo arrancó ella.
-// Compilar: tools/app/build.sh
+// Dos modos:
+//  - Instalada (desde el .dmg): trae Python, ffmpeg y el motor dentro de Contents/Resources;
+//    los videos y ajustes van a ~/Movies/Kanu.
+//  - Desarrollo (en la raíz del repositorio): la primera vez crea backend/.venv y usa el repo como datos.
+// Arranca el motor si no está corriendo y lo apaga al cerrar si lo arrancó ella.
+// Compilar: tools/app/build.sh · Instalador: tools/app/empaquetar.sh
 import Cocoa
 import WebKit
 
@@ -9,14 +12,23 @@ let fm = FileManager.default
 let url = URL(string: "http://localhost:8765")!
 let logURL = fm.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Kanu.log")
 
-// Raíz del repo: la carpeta que contiene Kanu.app (si tiene backend/); si no, ~/Kanu.
+let resources = Bundle.main.resourceURL!
+let bundledPython = resources.appendingPathComponent("python/bin/python3")
+let installed = fm.isExecutableFile(atPath: bundledPython.path)
+let gyroflowApp = "/Applications/Gyroflow.app"
+let gyroflowURL = URL(string: "https://gyroflow.xyz/download")!
+
+// Raíz del código: dentro de la app si está instalada; si no, la carpeta del repo junto a Kanu.app (o ~/Kanu).
 let kanuDir: URL = {
+    if installed { return resources.appendingPathComponent("kanu") }
     let beside = Bundle.main.bundleURL.deletingLastPathComponent()
     if fm.fileExists(atPath: beside.appendingPathComponent("backend/pyproject.toml").path) { return beside }
     return fm.homeDirectoryForCurrentUser.appendingPathComponent("Kanu")
 }()
 let backendDir = kanuDir.appendingPathComponent("backend")
-let venvPython = backendDir.appendingPathComponent(".venv/bin/python")
+let venvPython = installed ? bundledPython : backendDir.appendingPathComponent(".venv/bin/python")
+// Carpeta de datos: ~/Movies/Kanu instalada; la raíz del repo en desarrollo.
+let dataDir = installed ? fm.homeDirectoryForCurrentUser.appendingPathComponent("Movies/Kanu") : kanuDir
 
 func logHandle() -> FileHandle? {
     if !fm.fileExists(atPath: logURL.path) { fm.createFile(atPath: logURL.path, contents: nil) }
@@ -95,8 +107,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
                 self.startServer()
             }
             for _ in 0..<120 { if serverUp() { break }; usleep(250_000) }
-            DispatchQueue.main.async { self.web.load(URLRequest(url: url)) }
+            DispatchQueue.main.async {
+                self.web.load(URLRequest(url: url))
+                self.checkGyroflow()
+            }
         }
+    }
+
+    // Gyroflow no va dentro de Kanu: si falta, avisa una vez (sin él todo funciona menos la estabilización).
+    func checkGyroflow() {
+        let key = "noAvisarGyroflow"
+        guard !fm.fileExists(atPath: gyroflowApp), !UserDefaults.standard.bool(forKey: key) else { return }
+        let a = NSAlert()
+        a.messageText = "Falta Gyroflow"
+        a.informativeText = "Kanu usa Gyroflow (gratis) para estabilizar los videos. Todo lo demás funciona sin él.\n\n"
+            + "Descárgalo, arrástralo a Aplicaciones y vuelve a abrir Kanu."
+        a.addButton(withTitle: "Descargar Gyroflow")
+        a.addButton(withTitle: "Ahora no")
+        a.showsSuppressionButton = true
+        a.suppressionButton?.title = "No volver a avisar"
+        a.beginSheetModal(for: window) { r in
+            if a.suppressionButton?.state == .on { UserDefaults.standard.set(true, forKey: key) }
+            if r == .alertFirstButtonReturn { NSWorkspace.shared.open(gyroflowURL) }
+        }
+    }
+
+    @objc func showData() {
+        try? fm.createDirectory(at: dataDir, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(dataDir)
     }
 
     func status(_ text: String) {
@@ -116,7 +154,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
         if !fm.fileExists(atPath: backendDir.path) {
             return "No encuentro la carpeta del proyecto (\(kanuDir.path)). Deja Kanu.app en la raíz del repositorio."
         }
-        if fm.isExecutableFile(atPath: venvPython.path) { return nil }
+        if installed || fm.isExecutableFile(atPath: venvPython.path) { return nil }
         guard let py = findPython() else {
             return "Hace falta Python 3.11 o más nuevo. Instálalo con: brew install python"
         }
@@ -135,6 +173,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
         p.executableURL = venvPython
         p.arguments = ["-m", "kanu", "--no-browser"]
         p.currentDirectoryURL = backendDir
+        if installed {
+            var env = ProcessInfo.processInfo.environment
+            let bin = resources.appendingPathComponent("bin")
+            env["KANU_DATA"] = dataDir.path
+            env["KANU_FFMPEG"] = bin.appendingPathComponent("ffmpeg").path
+            env["KANU_FFPROBE"] = bin.appendingPathComponent("ffprobe").path
+            env["PYTHONPATH"] = backendDir.path
+            env["PYTHONDONTWRITEBYTECODE"] = "1"   // no escribir dentro de la app firmada
+            env["PATH"] = bin.path + ":/usr/bin:/bin:/usr/sbin:/sbin"
+            p.environment = env
+            try? fm.createDirectory(at: dataDir, withIntermediateDirectories: true)
+        }
         let h = logHandle(); p.standardOutput = h; p.standardError = h
         try? p.run()
         server = p
@@ -204,6 +254,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Salir de Kanu", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         app.submenu = appMenu
+
+        let file = NSMenuItem(); main.addItem(file)
+        let fileMenu = NSMenu(title: "Archivo")
+        fileMenu.addItem(withTitle: "Mostrar carpeta de Kanu", action: #selector(showData), keyEquivalent: "o")
+        file.submenu = fileMenu
 
         let edit = NSMenuItem(); main.addItem(edit)
         let editMenu = NSMenu(title: "Edición")

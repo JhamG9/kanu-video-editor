@@ -41,8 +41,22 @@ Kanu corrige y exporta todo solo.
 
 ## Instalar
 
-Requisitos: un Mac con Apple Silicon (macOS 12 o más nuevo), [Homebrew](https://brew.sh),
-Python 3.11 o más nuevo, ffmpeg y [Gyroflow](https://gyroflow.xyz) (gratis) en Aplicaciones.
+Necesitas un Mac con Apple Silicon (M1 o más nuevo) y macOS 12 o más reciente.
+
+1. Descarga **Kanu-x.y.z.dmg** de la sección *Releases* de este repositorio y ábrelo.
+2. Arrastra **Kanu** a **Aplicaciones**.
+3. La primera vez, macOS dirá que la app es de un desarrollador no identificado (no está firmada con una
+   cuenta de Apple). Haz clic derecho en Kanu → **Abrir** → **Abrir**. Solo hace falta una vez.
+4. Instala [Gyroflow](https://gyroflow.xyz/download) (gratis) en Aplicaciones para poder estabilizar.
+   Si falta, Kanu te avisa; todo lo demás funciona sin él.
+
+No hace falta instalar nada más: Kanu trae dentro Python, ffmpeg y todo lo necesario.
+Tus videos, ajustes y exportados se guardan en **~/Movies/Kanu** (menú *Archivo → Mostrar carpeta de Kanu*).
+Si algo falla al arrancar, el detalle queda en `~/Library/Logs/Kanu.log`.
+
+### Desde el código (para desarrollar)
+
+Requisitos: [Homebrew](https://brew.sh), Python 3.11 o más nuevo, ffmpeg y Gyroflow.
 
 ```bash
 brew install python ffmpeg
@@ -52,17 +66,21 @@ brew install python ffmpeg
 git clone <url-de-este-repositorio> Kanu
 ```
 
-Luego abre **Kanu.app** desde la carpeta `Kanu` (puedes arrastrarlo al Dock).
-La primera vez tarda uno o dos minutos: crea el entorno de Python e instala lo necesario.
-Después abre en unos segundos.
+Abre **Kanu.app** desde la carpeta `Kanu`. La primera vez tarda uno o dos minutos: crea el entorno de Python
+e instala lo necesario. En este modo Kanu.app tiene que quedarse dentro del repositorio, y los videos y todo
+lo que genera Kanu (`Videos/`, `videos subir/`, `Exportados/`, `ajustes/`, `estilo/`, `tandas/`, `.cache/`)
+se guardan en la propia carpeta, sin ir al repositorio.
 
-- Kanu.app tiene que quedarse dentro de la carpeta del repositorio, porque ahí busca el motor y guarda los videos.
-- Si descargaste el repositorio como .zip en lugar de clonarlo, macOS puede bloquear la app la primera vez.
-  Haz clic derecho en Kanu.app → **Abrir** → **Abrir**.
-- Si algo falla al arrancar, el detalle queda en `~/Library/Logs/Kanu.log`.
+### Crear el instalador
 
-Los videos y todo lo que genera Kanu (`Videos/`, `videos subir/`, `Exportados/`, `ajustes/`, `estilo/`,
-`tandas/`, `.cache/`) se quedan en tu Mac y no van al repositorio.
+```bash
+tools/app/empaquetar.sh
+```
+
+Deja `Kanu-<versión>.dmg` en la raíz del proyecto. La primera vez descarga un Python portátil
+([python-build-standalone](https://github.com/astral-sh/python-build-standalone), con su suma SHA-256 comprobada)
+y ffmpeg para Apple Silicon ([Martin Riedl](https://ffmpeg.martin-riedl.de)) en `build/`. El `.dmg` pesa más
+de 100 MB, así que no va al repositorio: súbelo como archivo de una *Release* en GitHub.
 
 ## Cómo está hecho
 
@@ -80,7 +98,7 @@ backend/            motor en Python (FastAPI)
   kanu/cli.py       uso desde terminal (python -m kanu.cli stock)
   tests/            pytest (usan una carpeta de datos temporal)
 apps/legacy-ui/     interfaz (HTML + JS), servida por el backend
-tools/app/          código de Kanu.app (Swift) y build.sh para recompilarla
+tools/app/          código de Kanu.app (Swift), build.sh y empaquetar.sh (instalador .dmg)
 tools/icono/        generador del icono (tucán)
 ```
 
@@ -107,3 +125,4 @@ el dueño del repositorio lo revisa y lo aprueba. Los detalles están en [CONTRI
 ## Licencia
 
 [MIT](LICENSE): puedes usar, modificar y compartir Kanu libremente, manteniendo el aviso de autoría.
+El instalador incluye ffmpeg, que se distribuye con su propia licencia (GPL v3).
