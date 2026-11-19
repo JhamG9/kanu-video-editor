@@ -5,11 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kanu</title>
 <link rel="icon" type="image/png" href="/static/icon.png?v=6">
-<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/style.css?v=9">
 </head>
 <body>
 <header>
   <div class="brand" id="brand" title="Acerca de Kanu"><img src="/static/icon.png?v=6" alt=""><span>Kanu</span></div>
+  <button id="btnHome" class="ghost small home-btn" title="Inicio"><svg class="ic" viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9a1 1 0 0 0 1 1H10v-5.5h4V20h3.5a1 1 0 0 0 1-1v-9"/></svg> Inicio</button>
   <button id="btnSide" class="ghost small side-btn icon" title="Achicar o agrandar la lista de videos (tecla B)"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg></button>
   <div class="hdr-actions">
     <button id="batchPill" class="batch-pill hidden" title="Ver el avance de la tanda"><img src="/static/icon.png?v=6" alt=""><span id="batchPillTxt"></span></button>
@@ -20,6 +21,60 @@
     <button id="btnSettings" class="ghost icon" title="Ajustes: mi estilo de color"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   </div>
 </header>
+
+<!-- Inicio: lo primero que se ve al abrir Kanu -->
+<section id="home" class="home hidden" aria-label="Inicio">
+  <div class="home-wrap">
+    <div class="hero" id="hero">
+      <div class="hero-bg" id="heroBg"></div>
+      <div class="hero-txt">
+        <div class="hero-kicker" id="homeHello">Hola</div>
+        <h1 id="homeTitle">¿Qué preparamos hoy<br>para stock?</h1>
+        <p id="homeLead"></p>
+        <div class="hero-actions">
+          <button class="primary big" id="homeUpload"><svg class="ic" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg> Subir videos</button>
+          <button class="glass big hidden" id="homeContinue"></button>
+        </div>
+        <div class="hero-drop">o suelta los videos en cualquier parte de esta ventana</div>
+      </div>
+      <img class="hero-toucan" src="/static/icon.png?v=6" alt="" id="homeToucan" title="Acerca de Kanu">
+    </div>
+
+    <div class="stats" id="homeStats"></div>
+
+    <div class="notice hidden" id="homeGyro">
+      <span><b>Falta Gyroflow.</b> Todo funciona menos la estabilización. Es gratis.</span>
+      <a href="https://gyroflow.xyz/download" target="_blank" rel="noopener">Descargar Gyroflow →</a>
+    </div>
+
+    <section class="hsec" id="homeTandasSec">
+      <div class="hsec-h"><h2>Tus tandas</h2><span class="hint" id="homeTandasHint"></span></div>
+      <div class="tandas" id="homeTandas"></div>
+    </section>
+
+    <section class="hsec hidden" id="homeSteps">
+      <div class="hsec-h"><h2>Así de fácil</h2></div>
+      <div class="steps">
+        <div class="step"><span class="n">1</span><b>Sube tus videos</b><span>De la cámara, el dron o el celular. Los originales nunca se tocan.</span></div>
+        <div class="step"><span class="n">2</span><b>Kanu los corrige</b><span>Color natural, ruido, estabilización, horizonte recto y cortes de 12 a 14 s.</span></div>
+        <div class="step"><span class="n">3</span><b>Revisa y exporta</b><span>Compara antes y después, ajusta si quieres y exporta en 4K listo para stock.</span></div>
+      </div>
+    </section>
+
+    <div class="hcols">
+      <section class="hsec">
+        <div class="hsec-h"><h2>Listos para subir</h2><button class="ghost small" id="homeOpenFinals">Abrir carpeta</button></div>
+        <div class="finals" id="homeFinals"></div>
+      </section>
+      <section class="hsec">
+        <div class="hsec-h"><h2>¿Sabías que…?</h2><div class="tip-dots" id="tipDots"></div></div>
+        <div class="tip" id="homeTip"></div>
+      </section>
+    </div>
+
+    <footer class="home-foot"><span id="homeVersion">Kanu</span> · Dibujado a plumilla, hecho a pico · <a href="#" id="homeAbout">Acerca de Kanu</a></footer>
+  </div>
+</section>
 
 <main>
   <aside id="clipList" class="clips"></aside>
@@ -350,6 +405,6 @@
 </div>
 
 <div id="toast" class="toast hidden"></div>
-<script src="/static/app.js"></script>
+<script src="/static/app.js?v=10"></script>
 </body>
 </html>

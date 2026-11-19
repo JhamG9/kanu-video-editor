@@ -844,6 +844,7 @@ async function pollJobs() {
     const jobs = await (await api("/api/jobs")).json();
     const pending = jobs.filter((j) => ["en cola", "procesando", "estabilizando"].includes(j.status)).length;
     const b = $("#jobsBadge"); b.textContent = pending; b.classList.toggle("hidden", !pending);
+    if (pending !== S.jobsPending) { S.jobsPending = pending; if (atHome()) renderHome(); }
     const list = $("#jobsList");
     list.innerHTML = jobs.length ? "" : `<div class="job hint">No hay exportaciones.</div>`;
     for (const j of jobs.slice().reverse()) {
@@ -934,6 +935,7 @@ function bind() {
   $("#tpMute").onclick = () => { P.muted = !P.muted; if (P.v) P.v.muted = P.muted; renderTransport(); };
   renderTransport();
   document.onkeydown = (e) => {
+    if (atHome()) return;                      // en Inicio no hay reproductor ni ajustes
     const typing = (e.target.tagName === "INPUT" && e.target.type !== "range") || e.target.tagName === "TEXTAREA";
     const mod = e.metaKey || e.ctrlKey, k = e.key.toLowerCase();
     if (mod && (k === "z" || k === "y") && !typing && [...document.querySelectorAll(".modal")].every((m) => m.classList.contains("hidden"))) {
@@ -1381,14 +1383,159 @@ async function reloadClips() {
   S.clips = d.clips; S.presets = d.presets; S.denoiseLabels = d.denoise;
   S.stabLevels = d.stab_levels; S.stabMethods = d.stab_methods; S.stabAvailable = d.stab_available;
   renderClipList();
+  if (atHome()) renderHome();
   return d;
+}
+
+// ---------------------------------------------------------------- inicio
+const HM = { data: null, tip: 0, tipTimer: null, heroFor: null };
+const atHome = () => document.body.classList.contains("at-home");
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
+const thumbUrl = (c, w = 320) => `/api/frame?clip=${encodeURIComponent(c.name)}&t=${(c.meta.duration * 0.4).toFixed(2)}&w=${w}`;
+const ago = (sec) => {
+  const d = Date.now() / 1000 - sec;
+  if (d < 60) return "ahora"; if (d < 3600) return `hace ${Math.round(d / 60)} min`;
+  if (d < 86400) return `hace ${Math.round(d / 3600)} h`; return `hace ${plural(Math.round(d / 86400), "día")}`;
+};
+const TIPS = [
+  ["✦", "Corrige todo de una vez", "<b>✦ Corregir todo</b> analiza cada clip y aplica color natural, ruido, estabilización y horizonte. Los que ajustaste a mano no se tocan."],
+  ["⇆", "Antes y después", "En el visor elige <b>Dividido</b> y arrastra la línea para comparar el original con la corrección."],
+  ["⌨", "Atajos del reproductor", "<kbd>Espacio</kbd> o <kbd>K</kbd> reproduce, <kbd>J</kbd> / <kbd>L</kbd> saltan 5 s y <kbd>←</kbd> <kbd>→</kbd> mueven 1 s."],
+  ["📐", "Horizonte torcido", "En <b>Enderezar</b> usa <b>Trazar línea recta</b> sobre un edificio o el horizonte y el clip se gira solo."],
+  ["◎", "Manchas del sensor", "¿Un punto oscuro en el mismo sitio de todo el video? Márcalo en <b>Manchas del sensor</b> y Kanu le devuelve la luz."],
+  ["↺", "Deshacer sin miedo", "<kbd>⌘</kbd> <kbd>Z</kbd> deshace cualquier ajuste y <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>Z</kbd> lo rehace. Doble clic en un control lo pone en 0."],
+  ["🎞", "Un clip más por toma", "Si ralentizar un poco permite sacar otro clip de 12 a 14 s, Kanu lo hace sin inventar fotogramas."],
+  ["🎨", "Tu propio estilo", "En <b>Ajustes</b> sube pares de antes y después editados por ti y Kanu aprende tu forma de corregir el color."],
+];
+
+function groupsOf(clips) {
+  const m = new Map();
+  for (const c of clips) {
+    const g = c.group || { id: "x", title: "Videos", sub: "", sort: "" };
+    if (!m.has(g.id)) m.set(g.id, { ...g, clips: [] });
+    m.get(g.id).clips.push(c);
+  }
+  return [...m.values()].sort((a, b) => (a.sort < b.sort ? 1 : -1));
+}
+
+function renderHome() {
+  const clips = S.clips || [], groups = groupsOf(clips), d = HM.data || { finals: { count: 0, bytes: 0, latest: [] } };
+  const ok = clips.filter((c) => c.settings.status === "aprobado").length;
+  const empty = !clips.length;
+  const h = new Date().getHours();
+  $("#homeHello").textContent = h < 12 ? "Buenos días" : h < 19 ? "Buenas tardes" : "Buenas noches";
+  $("#homeTitle").innerHTML = empty ? "Bienvenido a Kanu" : "¿Qué preparamos hoy<br>para stock?";
+  $("#homeLead").textContent = empty
+    ? "Tú sales a grabar. Sube tu primera tanda y Kanu se encarga del resto: color, ruido, estabilización, cortes y exportación en 4K."
+    : `Tienes ${plural(clips.length, "video")} en ${plural(groups.length, "tanda")}` +
+      (ok ? `, ${plural(ok, "aprobado")}` : "") +
+      (d.finals.count ? ` y ${plural(d.finals.count, "final listo", "finales listos")} para subir.` : ".");
+
+  // seguir editando: el último clip que tocaste
+  const last = clips.find((c) => c.name === (S.cur || d.last_edited));
+  const cont = $("#homeContinue");
+  cont.classList.toggle("hidden", !last);
+  if (last) {
+    cont.innerHTML = `<img src="${thumbUrl(last)}" alt=""><span>Seguir con <b>${esc(last.name.replace(/\.[^.]+$/, ""))}</b><br><small>${esc(last.group?.title || "")}</small></span>`;
+    cont.onclick = () => openClip(last.name);
+    if (HM.heroFor !== last.name) {                        // fondo: un fotograma grande de ese clip
+      HM.heroFor = last.name;
+      const bg = $("#heroBg"); bg.classList.remove("on");
+      const src = thumbUrl(last, 1600);
+      loadImage(src).then(() => { bg.style.backgroundImage = `url("${src}")`; bg.classList.add("on"); }).catch(() => {});
+    }
+  }
+
+  const pending = S.jobsPending || 0;
+  const pct = clips.length ? Math.round((ok / clips.length) * 100) : 0;
+  $("#homeStats").innerHTML = `
+    <div class="stat"><div class="v">${clips.length}</div><div class="l">${clips.length === 1 ? "video" : "videos"} en ${plural(groups.length, "tanda")}</div></div>
+    <div class="stat ok"><div class="v">${ok}<span class="hint" style="font-size:14px;font-weight:500"> / ${clips.length}</span></div><div class="l">aprobados</div><div class="bar"><div style="width:${pct}%"></div></div></div>
+    <div class="stat"><div class="v">${d.finals.count}</div><div class="l">finales listos · ${d.finals.bytes ? fmtSize(d.finals.bytes) : "0 MB"}</div></div>
+    <div class="stat"><div class="v" id="statQueue">${pending}</div><div class="l">${pending ? "exportando ahora" : "en la cola · todo al día"}</div></div>`;
+
+  $("#homeStats").classList.toggle("hidden", empty);
+  $("#homeGyro").classList.toggle("hidden", S.stabAvailable !== false);
+  $("#homeSteps").classList.toggle("hidden", !empty);
+  $("#homeTandasSec").classList.toggle("hidden", empty);
+  $("#homeTandasHint").textContent = groups.length ? `${plural(groups.length, "tanda")} · la más reciente primero` : "";
+
+  const box = $("#homeTandas"); box.innerHTML = "";
+  for (const g of groups) {
+    const okG = g.clips.filter((c) => c.settings.status === "aprobado").length;
+    const man = g.clips.filter((c) => c.settings.status === "manual").length;
+    const pics = g.clips.slice(0, 3);
+    const card = document.createElement("button");
+    card.className = "tanda";
+    card.innerHTML = `<div class="mosaic${pics.length < 3 ? " one" : ""}">${(pics.length < 3 ? pics.slice(0, 1) : pics)
+        .map((c, i) => `<img loading="lazy" src="${thumbUrl(c, i ? 320 : 640)}" alt="">`).join("")}</div>
+      <div class="info"><div class="nm" title="${esc(g.title)}">${esc(g.title)}</div>
+        <div class="sub">${plural(g.clips.length, "video")}${g.sub ? " · " + esc(g.sub) : ""}${man ? ` · ${plural(man, "ajustado a mano", "ajustados a mano")}` : ""}</div>
+        <div class="prog"><div class="bar"><div style="width:${Math.round((okG / g.clips.length) * 100)}%"></div></div>${okG}/${g.clips.length} aprobados</div></div>`;
+    card.onclick = () => {
+      S.openGroups.add(g.id); S.closedByUser?.delete(g.id); saveOpenGroups();
+      openClip((g.clips.find((c) => c.settings.status !== "aprobado") || g.clips[0]).name);
+    };
+    box.appendChild(card);
+  }
+
+  const fin = $("#homeFinals");
+  fin.innerHTML = d.finals.latest.length
+    ? d.finals.latest.map((f) => `<div class="final"><span class="dot"></span><span class="nm">${esc(f.name)}</span>
+        <span class="hint">${fmtSize(f.bytes)} · ${ago(f.mtime)}</span></div>`).join("") +
+      (d.finals.count > d.finals.latest.length ? `<div class="more">y ${plural(d.finals.count - d.finals.latest.length, "más", "más")} en <b>videos subir/</b></div>` : "")
+    : `<div class="final hint">Aún no hay finales. Cuando exportes, aparecen aquí listos para subir al banco de stock.</div>`;
+  $("#homeVersion").textContent = `Kanu ${d.version || ""}`.trim();
+}
+
+function showTip(i, animate = true) {
+  HM.tip = (i + TIPS.length) % TIPS.length;
+  const [ic, t, body] = TIPS[HM.tip], el = $("#homeTip");
+  el.innerHTML = `<span class="ti">${ic}</span><div class="tb"><b>${t}</b><span>${body}</span></div>`;
+  if (animate) { el.classList.remove("swap"); void el.offsetWidth; el.classList.add("swap"); }
+  $("#tipDots").innerHTML = TIPS.map((_, j) => `<button class="${j === HM.tip ? "on" : ""}" data-i="${j}" aria-label="Consejo ${j + 1}"></button>`).join("");
+  clearTimeout(HM.tipTimer);
+  HM.tipTimer = setTimeout(() => atHome() && showTip(HM.tip + 1), 9000);
+}
+
+async function showHome() {
+  stopPlayer();
+  document.body.classList.add("at-home");
+  $("#home").classList.remove("hidden");
+  $("#home").scrollTop = 0;
+  try { HM.data = await (await api("/api/home")).json(); } catch { /* sin datos extra */ }
+  renderHome();
+  showTip(HM.tip, false);
+}
+
+function showEditor() {
+  document.body.classList.remove("at-home");
+  $("#home").classList.add("hidden");
+  clearTimeout(HM.tipTimer);
+}
+
+async function openClip(name) {
+  showEditor();
+  if (name !== S.cur) await selectClip(name); else renderClipList();
+}
+
+function initHome() {
+  $("#btnHome").onclick = () => (atHome() ? showEditor() : showHome());
+  $("#homeUpload").onclick = openBatch;
+  $("#homeOpenFinals").onclick = () => api("/api/open-exports", { method: "POST" });
+  $("#homeToucan").onclick = $("#homeAbout").onclick = (e) => { e.preventDefault(); $("#iconModal").classList.remove("hidden"); };
+  $("#tipDots").onclick = (e) => { const i = e.target.dataset?.i; if (i != null) showTip(+i); };
 }
 
 (async function init() {
   await reloadClips();
   bind();
+  initHome();
   setMode("after");
-  if (S.clips.length) await selectClip(S.clips[0].name);
+  const home = showHome();                     // Kanu abre en Inicio; el editor se prepara detrás
+  await home;
+  if (S.clips.length) await selectClip(S.clips.find((c) => c.name === HM.data?.last_edited)?.name || S.clips[0].name);
   else {
     $("#clipName").textContent = "Sin videos todavía";
     $("#clipList").innerHTML = `<div class="empty"><div class="empty-ic">⇪</div><b>Aún no hay videos</b>

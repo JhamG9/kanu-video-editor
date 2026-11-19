@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from kanu import __version__, config
 from kanu.core import style
 
-from .routes import batches, clips, export, media, spots
+from .routes import batches, clips, export, home, media, spots
 from .routes import style as style_routes
 
 UI = config.ROOT / "apps" / "legacy-ui"
@@ -32,7 +32,7 @@ def create_app() -> FastAPI:
     async def failed(_: Request, e: Exception):
         return JSONResponse({"error": str(e)}, status_code=500)
 
-    for r in (clips, media, spots, export, batches, style_routes):
+    for r in (clips, media, spots, export, batches, home, style_routes):
         app.include_router(r.router)
 
     @app.get("/api/health", tags=["sistema"])
