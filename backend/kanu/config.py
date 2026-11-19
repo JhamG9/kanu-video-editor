@@ -30,5 +30,5 @@ FFMPEG = _bin("KANU_FFMPEG", "ffmpeg", "/opt/homebrew/bin/ffmpeg")
 FFPROBE = _bin("KANU_FFPROBE", "ffprobe", "/opt/homebrew/bin/ffprobe")
 GYROFLOW = os.environ.get("KANU_GYROFLOW", "/Applications/Gyroflow.app/Contents/MacOS/gyroflow")
 
-for d in (AJUSTES, CACHE / "frames", CACHE / "luts", EXPORT):
+for d in (VIDEOS, AJUSTES, CACHE / "frames", CACHE / "luts", EXPORT):
     d.mkdir(parents=True, exist_ok=True)

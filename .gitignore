@@ -6,7 +6,16 @@
 /estilo/
 /tandas/
 /.cache/
-/Kanu.app/
+
+# Cualquier video o LUT suelto, esté donde esté
+*.mp4
+*.MP4
+*.mov
+*.MOV
+*.mxf
+*.MXF
+*.m4v
+*.cube
 
 # Python
 __pycache__/
