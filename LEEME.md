@@ -58,10 +58,12 @@ En **Enderezar** (panel derecho):
 
 ### Manchas del sensor (polvo)
 Si una mancha difusa aparece en el mismo lugar en todo el video:
-1. En **Manchas del sensor** (panel derecho) pulsa **◎ Marcar mancha**. El visor muestra el original sin girar.
-2. Haz **clic justo encima** de la mancha. Kanu encuentra su centro y su tamaño (tarda unos segundos).
-   Si quieres, arrastra el círculo para moverlo o su punto para agrandarlo: Kanu la vuelve a medir.
-3. Pulsa **✓ Listo**. En ~1 min el visor muestra el clip sin manchas; la exportación también sale limpia.
+1. En **Manchas del sensor** (panel derecho) pulsa **◎ Marcar manchas**. El visor muestra el original sin girar.
+2. Haz **clic sobre cada mancha**: aparece un círculo (todavía no se mide nada). Arrástralo para moverlo y
+   usa su punto para agrandarlo. Puedes poner varios o quitarlos con ✕.
+3. Cuando todo esté cuadrado, pulsa **▶ Empezar**: Kanu mide todas las manchas y limpia el video (~1 min).
+   Si un círculo queda en rojo («no encontré mancha»), muévelo justo encima o quítalo y pulsa Empezar otra vez.
+   **Cancelar** (o Esc) descarta los cambios.
 
 Cómo funciona: el polvo no tapa la imagen, la oscurece un poco. Kanu mide cuánto y le devuelve esa luz,
 sin inventar píxeles. Se hace antes de estabilizar (la mancha está fija en el sensor) y la estabilización
