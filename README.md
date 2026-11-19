@@ -98,3 +98,12 @@ Si cambias `tools/app/Kanu.swift`, recompila la app con `tools/app/build.sh` (ha
 Command Line Tools).
 
 Próximas fases: `apps/ui` (React + TypeScript + Vite) y `apps/desktop` (Electron, arranca el backend).
+
+## Contribuir
+
+Kanu es de código abierto y las mejoras son bienvenidas. Haz un fork, crea una rama y abre un pull request;
+el dueño del repositorio lo revisa y lo aprueba. Los detalles están en [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Licencia
+
+[MIT](LICENSE): puedes usar, modificar y compartir Kanu libremente, manteniendo el aviso de autoría.
