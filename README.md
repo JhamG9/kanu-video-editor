@@ -4,6 +4,11 @@
   <img src="docs/img/kanu-icono.png" alt="Logo de Kanu, un tucán" width="160">
 </p>
 
+<p align="center">
+  <a href="https://github.com/JhamG9/kanu-video-editor/releases/download/v0.2.0/Kanu-0.2.0.dmg"><b>⬇ Descargar Kanu 0.2.0 para Mac</b></a>
+  (Apple Silicon, 108 MB) · <a href="#instalar">Cómo instalar</a>
+</p>
+
 Kanu es un editor de video para Mac, hecho para preparar clips para bancos de video de stock.
 Tú pones los videos de la cámara o del dron y Kanu los deja listos para subir:
 
@@ -43,7 +48,9 @@ Kanu corrige y exporta todo solo.
 
 Necesitas un Mac con Apple Silicon (M1 o más nuevo) y macOS 12 o más reciente.
 
-1. Descarga **Kanu-x.y.z.dmg** de [Releases](https://github.com/JhamG9/kanu-video-editor/releases) y ábrelo.
+1. Descarga **[Kanu-0.2.0.dmg](https://github.com/JhamG9/kanu-video-editor/releases/download/v0.2.0/Kanu-0.2.0.dmg)**
+   y ábrelo. Las versiones anteriores y las notas de cada una están en
+   [Releases](https://github.com/JhamG9/kanu-video-editor/releases).
 2. Arrastra **Kanu** a **Aplicaciones**.
 3. La primera vez, macOS dirá que la app es de un desarrollador no identificado (no está firmada con una
    cuenta de Apple). Haz clic derecho en Kanu → **Abrir** → **Abrir**. Solo hace falta una vez.
