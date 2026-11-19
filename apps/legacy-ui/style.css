@@ -358,3 +358,11 @@ body.side-mini .empty { display: none; }
 .transport .tp-play svg { width: 18px; height: 18px; fill: currentColor; }
 .transport .tp-play:not(.playing) svg { margin-left: 2px; }
 .transport .tp-sep { width: 1px; height: 18px; background: var(--line); margin: 0 4px; }
+
+/* manchas: círculos por medir, midiendo y sin mancha */
+.spot-layer circle.spot.pending { stroke-dasharray: 8 5; fill: rgba(141,180,224,.08); }
+.spot-layer circle.spot.busy { stroke-dasharray: 6 4; animation: spotSpin 1s linear infinite; }
+.spot-layer circle.spot.error { stroke: var(--bad); fill: rgba(240,106,90,.10); }
+.spot-item.pending span:first-child, .spot-item.busy span:first-child { color: var(--acc); }
+.spot-item.error span:first-child { color: var(--bad); }
+#spotActions { margin-top: 6px; }

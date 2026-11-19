@@ -302,32 +302,46 @@ let clTimer; function renderClipListDebounced() { clearTimeout(clTimer); clTimer
 
 // ---------------------------------------------------------------- enderezar
 // ---------------------------------------------------------------- manchas del sensor
-// Un clic sobre la mancha: Kanu encuentra su centro y su tamaño. El círculo se puede mover y agrandar.
+// Flujo: con «Marcar mancha» cada clic pone un círculo SIN medir nada. Se mueven y agrandan con calma y,
+// cuando todo está cuadrado, «Empezar» mide todas las manchas de una vez y limpia el video.
 // Se marca sobre el ORIGINAL (sin girar ni estabilizar), porque la mancha está fija en el sensor.
 function spotPct(sp) { return Math.round(sp.a * 100); }
+const draftOf = () => (S.settings.spots || []).map((sp) => ({ ...sp, state: "ok" }));
 function renderSpots() {
-  const spots = S.settings.spots || [], L = $("#spotLayer"), m = S.info.meta;
+  const m = S.info.meta, L = $("#spotLayer");
+  const list = S.spotMode ? S.spotDraft : (S.settings.spots || []).map((sp) => ({ ...sp, state: "ok" }));
   L.setAttribute("viewBox", `0 0 ${m.width} ${m.height}`);
   L.classList.toggle("hidden", !S.spotMode);
-  L.innerHTML = spots.map((sp, i) => `<circle class="spot${S.spotBusy === i ? " busy" : ""}" data-i="${i}" cx="${sp.x}" cy="${sp.y}" r="${sp.r}"/>
+  L.innerHTML = list.map((sp, i) => `<circle class="spot ${sp.state}" data-i="${i}" cx="${sp.x}" cy="${sp.y}" r="${sp.r}"/>
     <circle class="handle" data-h="${i}" cx="${sp.x + sp.r}" cy="${sp.y}" r="${Math.max(9, m.width / 300)}"/>`).join("");
-  $("#spotList").innerHTML = spots.map((sp, i) =>
-    `<div class="spot-item"><span>◎ Mancha ${i + 1} · oscurecía ${spotPct(sp)} %</span><span class="x" data-del="${i}" title="Quitar">✕</span></div>`).join("");
+  const label = (sp) => sp.state === "ok" ? `oscurecía ${spotPct(sp)} %` : sp.state === "busy" ? "midiendo…"
+    : sp.state === "error" ? "no encontré mancha: ajústalo" : "por medir";
+  $("#spotList").innerHTML = list.map((sp, i) =>
+    `<div class="spot-item ${sp.state}"><span>◎ Mancha ${i + 1} · ${label(sp)}</span>${S.spotBusy ? "" : `<span class="x" data-del="${i}" title="Quitar">✕</span>`}</div>`).join("");
   $("#spotList").querySelectorAll("[data-del]").forEach((x) => (x.onclick = () => {
-    S.settings.spots.splice(+x.dataset.del, 1); spotsChanged();
+    if (S.spotMode) { S.spotDraft.splice(+x.dataset.del, 1); renderSpots(); }
+    else { S.settings.spots.splice(+x.dataset.del, 1); spotsChanged(); }
   }));
-  $("#btnSpot").classList.toggle("on", !!S.spotMode);
-  $("#btnSpot").textContent = S.spotMode ? "✓ Listo" : "◎ Marcar mancha";
+  const changed = S.spotMode && JSON.stringify(S.spotDraft.map(({ x, y, r, state }) => [x, y, r, state]))
+    !== JSON.stringify(draftOf().map(({ x, y, r, state }) => [x, y, r, state]));
+  $("#btnSpot").classList.toggle("hidden", !!S.spotMode);
+  $("#spotActions").classList.toggle("hidden", !S.spotMode);
+  $("#btnSpotGo").disabled = !!S.spotBusy || !changed;
+  $("#btnSpotCancel").disabled = !!S.spotBusy;
+  const n = S.spotMode ? S.spotDraft.filter((s) => s.state !== "ok").length : 0;
+  $("#btnSpotGo").textContent = S.spotBusy ? S.spotBusy : n ? `▶ Empezar (${n})` : "▶ Empezar";
   const cl = (S.info.stab || {}).clean || {};
-  $("#spotInfo").textContent = S.spotMode ? "Haz clic justo encima de la mancha. Arrastra el círculo para moverlo o su punto para agrandarlo."
-    : !spots.length ? "Para el polvo del sensor: un punto difuso que está en el mismo lugar en todo el video."
+  $("#spotInfo").textContent = S.spotMode
+    ? (S.spotDraft.length ? "Mueve cada círculo arrastrándolo y agrándalo con su punto. Cuando todo esté cuadrado, pulsa Empezar."
+      : "Haz clic sobre cada mancha para poner un círculo encima.")
+    : !(S.settings.spots || []).length ? "Para el polvo del sensor: un punto difuso que está en el mismo lugar en todo el video."
     : cl.running ? "Quitando las manchas del video… (~1 min)"
     : cl.error ? "Error: " + cl.error.split("\n").pop()
     : cl.ready ? "✓ El visor y la exportación ya van sin manchas." : "Se quitarán al exportar.";
 }
 function setSpotMode(on) {
-  if (on) pause();
-  S.spotMode = on;
+  if (on) { pause(); S.spotDraft = draftOf(); }
+  S.spotMode = on; S.spotBusy = null;
   view.rot = on ? 0 : +S.settings.rotate || 0; view.draw();        // sin girar, para marcar sobre el sensor
   renderSpots(); loadFrame();
 }
@@ -350,25 +364,31 @@ function watchClean() {
     }
   }, 2000);
 }
-async function measureSpot(x, y, r, replace) {
-  const spots = S.settings.spots || (S.settings.spots = []);
-  S.spotBusy = replace ?? spots.length;
-  if (replace == null) spots.push({ x, y, r, a: 0, s: r / 2.4 });
-  else Object.assign(spots[replace], { x, y, r });
-  renderSpots(); $("#spotInfo").textContent = "Midiendo la mancha en todo el video…";
-  try {
-    const sp = await (await api(`/api/spot/measure?clip=${encodeURIComponent(S.cur)}&x=${x.toFixed(1)}&y=${y.toFixed(1)}&r=${r.toFixed(1)}`,
-      { method: "POST" })).json();
-    spots[S.spotBusy] = sp; S.spotBusy = null;
-    toast(`Mancha encontrada: oscurecía ${spotPct(sp)} %`);
-    await spotsChanged();
-  } catch (e) {
-    if (replace == null) spots.pop();
-    S.spotBusy = null; renderSpots(); toast(e.message, 4000);
+// «Empezar»: mide todas las manchas por medir y, si hay alguna buena, limpia el video
+async function startSpots() {
+  const clip = S.cur, todo = S.spotDraft.filter((s) => s.state !== "ok");
+  let i = 0;
+  for (const sp of todo) {
+    i++; S.spotBusy = `Midiendo ${i} de ${todo.length}…`; sp.state = "busy"; renderSpots();
+    try {
+      const r = await (await api(`/api/spot/measure?clip=${encodeURIComponent(clip)}&x=${sp.x.toFixed(1)}&y=${sp.y.toFixed(1)}&r=${(sp.r / 1.2).toFixed(1)}`,
+        { method: "POST" })).json();
+      Object.assign(sp, r, { state: "ok" });
+    } catch { sp.state = "error"; }
+    if (S.cur !== clip) return;
   }
+  S.spotBusy = null;
+  const bad = S.spotDraft.filter((s) => s.state === "error").length;
+  if (bad) { renderSpots(); toast(`${bad} círculo${bad > 1 ? "s" : ""} sin mancha: muévelo justo encima o quítalo y pulsa Empezar otra vez`, 5000); return; }
+  S.settings.spots = S.spotDraft.map(({ x, y, r, a, s, fit }) => ({ x, y, r, a, s, fit }));
+  setSpotMode(false);
+  toast(`${S.settings.spots.length} mancha${S.settings.spots.length > 1 ? "s" : ""} lista${S.settings.spots.length > 1 ? "s" : ""}: quitándolas del video…`);
+  await spotsChanged();
 }
 function initSpots() {
-  $("#btnSpot").onclick = () => setSpotMode(!S.spotMode);
+  $("#btnSpot").onclick = () => setSpotMode(true);
+  $("#btnSpotGo").onclick = startSpots;
+  $("#btnSpotCancel").onclick = () => setSpotMode(false);
   const L = $("#spotLayer");
   const toSrc = (e) => {
     const b = L.getBoundingClientRect(), m = S.info.meta;
@@ -376,26 +396,25 @@ function initSpots() {
   };
   let drag = null;
   L.onpointerdown = (e) => {
-    if (S.spotBusy != null) return;
+    if (S.spotBusy) return;
     const [x, y] = toSrc(e), t = e.target;
     if (t.dataset.i != null || t.dataset.h != null) {
-      const i = +(t.dataset.i ?? t.dataset.h), sp = S.settings.spots[i];
+      const i = +(t.dataset.i ?? t.dataset.h), sp = S.spotDraft[i];
       drag = { i, resize: t.dataset.h != null, dx: x - sp.x, dy: y - sp.y, moved: false };
       L.setPointerCapture(e.pointerId);
-    } else measureSpot(x, y, 40 * S.info.meta.width / 3840);
+    } else {                                    // clic en vacío: un círculo nuevo, sin medir todavía
+      S.spotDraft.push({ x, y, r: 48 * S.info.meta.width / 3840, a: 0, s: 0, state: "pending" });
+      renderSpots();
+    }
   };
   L.onpointermove = (e) => {
     if (!drag) return;
-    const [x, y] = toSrc(e), sp = S.settings.spots[drag.i];
+    const [x, y] = toSrc(e), sp = S.spotDraft[drag.i];
     if (drag.resize) sp.r = Math.max(8, Math.hypot(x - sp.x, y - sp.y));
     else { sp.x = x - drag.dx; sp.y = y - drag.dy; }
-    drag.moved = true; renderSpots();
+    sp.state = "pending"; drag.moved = true; renderSpots();
   };
-  L.onpointerup = () => {
-    if (!drag) return;
-    const d = drag; drag = null;
-    if (d.moved) { const sp = S.settings.spots[d.i]; measureSpot(sp.x, sp.y, sp.r / 1.2, d.i); }
-  };
+  L.onpointerup = () => { drag = null; };
 }
 
 function renderRotate() {
@@ -930,6 +949,7 @@ function bind() {
     if (e.key === "ArrowLeft") { step(e.shiftKey ? -0.1 : -1); e.preventDefault(); }
     if (e.key === " " || e.key === "k" || e.key === "K") { if (e.target.tagName === "BUTTON") e.target.blur(); togglePlay(); e.preventDefault(); }
     if (e.key === "Escape" && S.lineMode) setLineMode(false);
+    if (e.key === "Escape" && S.spotMode && !S.spotBusy) setSpotMode(false);
     if (e.key === "j" || e.key === "J") step(-5);
     if (e.key === "l" || e.key === "L") step(5);
     if (e.key === "Home") { $("#tpStart").click(); e.preventDefault(); }
