@@ -1,4 +1,12 @@
-# Kanu
+<p align="center">
+  <img src="docs/img/kanu-icono.png" alt="Logo de Kanu, un tucán" width="160">
+</p>
+
+<h1 align="center">Kanu - Editor de Video de Stock</h1>
+
+<p align="center">
+  <img src="docs/img/editor.jpg" alt="Editor de Kanu con un clip de dron de Bogotá" width="900">
+</p>
 
 Kanu es un editor de video para Mac, hecho para preparar clips para bancos de video de stock.
 Tú pones los videos de la cámara o del dron y Kanu los deja listos para subir:
@@ -15,6 +23,21 @@ Tú pones los videos de la cámara o del dron y Kanu los deja listos para subir:
 
 Se puede trabajar clip por clip en el editor, con vista antes/después, o procesar una tanda entera de una vez.
 La guía de uso paso a paso está en [LEEME.md](LEEME.md).
+
+## La interfaz
+
+**Antes y después.** La vista *Dividido* compara el original con la corrección sobre el mismo fotograma.
+
+![Vista dividida: original a la izquierda, corregido a la derecha](docs/img/antes-despues.jpg)
+
+**Subir una tanda.** Arrastra los videos, marca las opciones de la tanda y deja una nota si hace falta.
+Kanu corrige y exporta todo solo.
+
+![Ventana para subir videos con opciones de la tanda](docs/img/subir.jpg)
+
+**Exportar.** Elige los clips y los formatos. La versión final para stock va a `videos subir/`.
+
+![Ventana de exportación con clips y formatos](docs/img/exportar.jpg)
 
 ## Instalar
 
