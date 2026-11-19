@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/img/acerca.jpg" alt="Kanu: tú sales a grabar, Kanu se encarga del resto. Endereza, estabiliza, colorea, corta y exporta en 4K." width="800">
+  <img src="docs/img/acerca.png" alt="Kanu: tú sales a grabar, Kanu se encarga del resto. Endereza, estabiliza, colorea, corta y exporta en 4K." width="800">
 </p>
 
 Kanu es un editor de video para Mac, hecho para preparar clips para bancos de video de stock.
