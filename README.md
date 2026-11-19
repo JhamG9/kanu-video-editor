@@ -1,8 +1,8 @@
+<h1 align="center">Kanu - Editor de Video Stock</h1>
+
 <p align="center">
   <img src="docs/img/kanu-icono.png" alt="Logo de Kanu, un tucán" width="160">
 </p>
-
-<h1 align="center">Kanu - Editor de Video de Stock</h1>
 
 <p align="center">
   <img src="docs/img/editor.jpg" alt="Editor de Kanu con un clip de dron de Bogotá" width="900">
