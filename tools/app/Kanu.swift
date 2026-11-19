@@ -74,7 +74,7 @@ func serverUp() -> Bool {
 // Pantalla de carga: panel negro con el nombre y los créditos, y el tucán a sangre a la derecha.
 func splashHTML() -> String {
     let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
-    let iconFile = kanuDir.appendingPathComponent("apps/legacy-ui/icon.png")
+    let iconFile = kanuDir.appendingPathComponent("apps/legacy-ui/splash.png")
     let icon = (try? Data(contentsOf: iconFile)).map { "data:image/png;base64," + $0.base64EncodedString() } ?? ""
     return """
     <!doctype html><html><head><meta charset="utf-8"><style>
@@ -90,12 +90,13 @@ func splashHTML() -> String {
     .st:after{content:"";display:inline-block;width:1.2em;text-align:left;animation:d 1.2s steps(4) infinite}
     @keyframes d{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
     .cr{color:#8f9299;font-size:12px;line-height:1.55}
-    .r{flex:1;position:relative;overflow:hidden;background:#7a9ec6}
-    .r img{position:absolute;width:126%;left:-21%;top:-24px;transform-origin:40% 40%;animation:z 14s ease-out forwards}
-    @keyframes z{from{transform:scale(1.04)}to{transform:scale(1)}}
+    .r{flex:1;position:relative;overflow:hidden;background:#80a6d0}
+    .r img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform-origin:45% 60%;animation:z 3.4s ease-out forwards}
+    @keyframes z{from{transform:scale(1.07)}to{transform:scale(1)}}
     .bar{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.25)}
-    .bar i{display:block;height:100%;width:30%;background:#fff;animation:b 1.6s ease-in-out infinite}
-    @keyframes b{from{transform:translateX(-100%)}to{transform:translateX(340%)}}
+    .bar i{display:block;height:100%;width:0;background:#fff;animation:b 3s cubic-bezier(.3,.6,.4,1) forwards}
+    @keyframes b{from{width:0}to{width:88%}}
+    .bar i.done{width:100%!important;animation:none;transition:width .4s ease}
     </style></head><body>
     <div class="l">
       <div class="kanu">Kanu</div><div class="what">Editor de<br>Video Stock</div>
@@ -107,7 +108,8 @@ func splashHTML() -> String {
         Tú sales a grabar. Kanu se encarga del resto.</div>
     </div>
     <div class="r"><img src="\(icon)" alt=""><div class="bar"><i></i></div></div>
-    <script>function setStatus(t){document.getElementById('st').textContent=t}</script>
+    <script>function setStatus(t){document.getElementById('st').textContent=t;
+      if(t==='Listo'){var b=document.querySelector('.bar i');b.style.width=getComputedStyle(b).width;b.classList.add('done')}}</script>
     </body></html>
     """
 }
@@ -183,12 +185,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
         splashShownAt = Date()
     }
 
-    // Muestra el editor y desvanece la pantalla de carga (se ve al menos 1.8 s, como en las apps de Adobe).
+    // Muestra el editor y desvanece la pantalla de carga (se ve al menos 3 s, para que dé tiempo de verla).
     func reveal() {
         guard !revealed else { return }
         revealed = true
         status("Listo")
-        let wait = max(0, 1.8 - Date().timeIntervalSince(splashShownAt))
+        let wait = max(0, 3.0 - Date().timeIntervalSince(splashShownAt))
         DispatchQueue.main.asyncAfter(deadline: .now() + wait) {
             self.window.alphaValue = 0
             self.window.makeKeyAndOrderFront(nil)
