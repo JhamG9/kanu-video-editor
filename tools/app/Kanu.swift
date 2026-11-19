@@ -60,11 +60,6 @@ func findPython() -> String? {
     return nil
 }
 
-let loadingHTML = """
-<html><body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;
-background:#111316;color:#cfd3da;font:15px -apple-system,sans-serif"><div style="text-align:center">
-<div style="font-size:22px;color:#fff;margin-bottom:8px">Kanu</div><div>%@</div></div></body></html>
-"""
 
 func serverUp() -> Bool {
     var req = URLRequest(url: url, timeoutInterval: 0.5)
@@ -76,10 +71,56 @@ func serverUp() -> Bool {
     return ok
 }
 
+// Pantalla de carga: panel negro con el nombre y los créditos, y el tucán a sangre a la derecha.
+func splashHTML() -> String {
+    let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+    let iconFile = kanuDir.appendingPathComponent("apps/legacy-ui/icon.png")
+    let icon = (try? Data(contentsOf: iconFile)).map { "data:image/png;base64," + $0.base64EncodedString() } ?? ""
+    return """
+    <!doctype html><html><head><meta charset="utf-8"><style>
+    *{box-sizing:border-box} html,body{margin:0;height:100%;overflow:hidden;-webkit-user-select:none;cursor:default}
+    body{display:flex;font:13px/1.45 -apple-system,BlinkMacSystemFont,sans-serif;background:#0b0c0e;color:#e9e9ec}
+    .l{width:47%;padding:58px 52px 44px;display:flex;flex-direction:column}
+    .kanu{font-size:64px;font-weight:800;letter-spacing:-2px;line-height:.95;color:#8db4e0}
+    .what{font-size:30px;font-weight:800;letter-spacing:-.6px;line-height:1.05;color:#fff;margin-top:6px}
+    .sp{flex:1}
+    .ill{font-weight:700;color:#fff;margin-bottom:18px}
+    .c{color:#c9cbd0;font-size:14px;line-height:1.5}
+    .st{color:#fff;font-size:14px;margin:14px 0 16px;min-height:21px}
+    .st:after{content:"";display:inline-block;width:1.2em;text-align:left;animation:d 1.2s steps(4) infinite}
+    @keyframes d{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+    .cr{color:#8f9299;font-size:12px;line-height:1.55}
+    .r{flex:1;position:relative;overflow:hidden;background:#7a9ec6}
+    .r img{position:absolute;width:126%;left:-21%;top:-24px;transform-origin:40% 40%;animation:z 14s ease-out forwards}
+    @keyframes z{from{transform:scale(1.04)}to{transform:scale(1)}}
+    .bar{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.25)}
+    .bar i{display:block;height:100%;width:30%;background:#fff;animation:b 1.6s ease-in-out infinite}
+    @keyframes b{from{transform:translateX(-100%)}to{transform:translateX(340%)}}
+    </style></head><body>
+    <div class="l">
+      <div class="kanu">Kanu</div><div class="what">Editor de<br>Video Stock</div>
+      <div class="sp"></div>
+      <div class="ill">Ilustración: tucán a plumilla, hecho a pico.</div>
+      <div class="c">© 2026 Jhampier Giron y colaboradores.<br>Código abierto con licencia MIT.<br>Versión \(version)</div>
+      <div class="st" id="st">Abriendo</div>
+      <div class="cr">Hecho con Python, FastAPI, NumPy, FFmpeg, Gyroflow y WebKit.<br>
+        Tú sales a grabar. Kanu se encarga del resto.</div>
+    </div>
+    <div class="r"><img src="\(icon)" alt=""><div class="bar"><i></i></div></div>
+    <script>function setStatus(t){document.getElementById('st').textContent=t}</script>
+    </body></html>
+    """
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavigationDelegate {
     var window: NSWindow!
     var web: WKWebView!
     var server: Process?
+    var splash: NSWindow?
+    var splashWeb: WKWebView?
+    var splashShownAt = Date()
+    var revealed = false
+    var pendingStatus: String?
 
     func applicationDidFinishLaunching(_ n: Notification) {
         buildMenu()
@@ -97,20 +138,69 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
         window.contentView = web
         window.setFrameAutosaveName("KanuVentana")
         if !window.setFrameUsingName("KanuVentana") { window.center() }
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
 
-        status("Abriendo…")
+        showSplash()                                   // la ventana principal aparece cuando el editor ya cargó
+        status("Leyendo preferencias")
         DispatchQueue.global().async {
+            usleep(350_000)
             if !serverUp() {
                 if let err = self.prepare() { DispatchQueue.main.async { self.fail(err) }; return }
                 self.startServer()
             }
             for _ in 0..<120 { if serverUp() { break }; usleep(250_000) }
-            DispatchQueue.main.async {
-                self.web.load(URLRequest(url: url))
+            self.status("Cargando tus tandas")
+            DispatchQueue.main.async { self.web.load(URLRequest(url: url)) }
+        }
+    }
+
+    func showSplash() {
+        let size = NSSize(width: 880, height: 540)
+        let w = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless],
+                         backing: .buffered, defer: false)
+        w.isOpaque = false
+        w.backgroundColor = .clear
+        w.hasShadow = true
+        w.level = .floating
+        w.isMovableByWindowBackground = true
+        let sw = WKWebView(frame: NSRect(origin: .zero, size: size))
+        sw.navigationDelegate = self
+        sw.setValue(false, forKey: "drawsBackground")
+        sw.wantsLayer = true
+        sw.layer?.cornerRadius = 16
+        sw.layer?.masksToBounds = true
+        w.contentView = sw
+        sw.loadHTMLString(splashHTML(), baseURL: nil)
+        w.center()
+        splash = w; splashWeb = sw
+        // se muestra cuando el HTML (con el tucán) ya está pintado; por si tarda, a los 0.6 s igual
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { self.presentSplash() }
+    }
+
+    func presentSplash() {
+        guard let w = splash, !w.isVisible, !revealed else { return }
+        w.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        splashShownAt = Date()
+    }
+
+    // Muestra el editor y desvanece la pantalla de carga (se ve al menos 1.8 s, como en las apps de Adobe).
+    func reveal() {
+        guard !revealed else { return }
+        revealed = true
+        status("Listo")
+        let wait = max(0, 1.8 - Date().timeIntervalSince(splashShownAt))
+        DispatchQueue.main.asyncAfter(deadline: .now() + wait) {
+            self.window.alphaValue = 0
+            self.window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            NSAnimationContext.runAnimationGroup({ ctx in
+                ctx.duration = 0.35
+                self.window.animator().alphaValue = 1
+                self.splash?.animator().alphaValue = 0
+            }, completionHandler: {
+                self.splash?.orderOut(nil); self.splash = nil; self.splashWeb = nil
                 self.checkGyroflow()
-            }
+            })
         }
     }
 
@@ -138,10 +228,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
     }
 
     func status(_ text: String) {
-        DispatchQueue.main.async { self.web.loadHTMLString(String(format: loadingHTML, text), baseURL: nil) }
+        DispatchQueue.main.async {
+            guard let sw = self.splashWeb else { return }
+            if sw.isLoading { self.pendingStatus = text; return }
+            let js = "setStatus(\"\(text.replacingOccurrences(of: "\"", with: "'"))\")"
+            sw.evaluateJavaScript(js, completionHandler: nil)
+        }
     }
 
     func fail(_ text: String) {
+        splash?.orderOut(nil); splash = nil; splashWeb = nil
         let a = NSAlert(); a.messageText = "Kanu no pudo arrancar"
         a.informativeText = text + "\n\nDetalles en ~/Library/Logs/Kanu.log"
         a.addButton(withTitle: "Salir")
@@ -158,7 +254,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
         guard let py = findPython() else {
             return "Hace falta Python 3.11 o más nuevo. Instálalo con: brew install python"
         }
-        status("Preparando Kanu por primera vez (1–2 min)…")
+        status("Preparando Kanu por primera vez (1–2 min)")
         if run(py, ["-m", "venv", ".venv"], cwd: backendDir) != 0 { return "No se pudo crear el entorno de Python." }
         if run(venvPython.path, ["-m", "pip", "install", "-q", "-e", "."], cwd: backendDir) != 0 {
             try? fm.removeItem(at: backendDir.appendingPathComponent(".venv"))
@@ -168,7 +264,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
     }
 
     func startServer() {
-        status("Arrancando el motor…")
+        status("Arrancando el motor")
         let p = Process()
         p.executableURL = venvPython
         p.arguments = ["-m", "kanu", "--no-browser"]
@@ -194,7 +290,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
     func applicationWillTerminate(_ n: Notification) { server?.terminate() }
 
     // Si el motor aún no responde, reintenta.
+    func webView(_ w: WKWebView, didFinish n: WKNavigation!) {
+        if w === splashWeb {                            // estado que llegó antes de que cargara el HTML
+            if let s = pendingStatus { pendingStatus = nil; status(s) }
+            presentSplash()
+        } else if w === web, w.url?.host == "localhost" {
+            reveal()
+        }
+    }
+
     func webView(_ w: WKWebView, didFailProvisionalNavigation n: WKNavigation!, withError e: Error) {
+        if w === splashWeb { return }
         guard (e as NSError).code != NSURLErrorCancelled else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { w.load(URLRequest(url: url)) }
     }
