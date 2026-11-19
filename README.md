@@ -4,10 +4,6 @@
   <img src="docs/img/kanu-icono.png" alt="Logo de Kanu, un tucán" width="160">
 </p>
 
-<p align="center">
-  <img src="docs/img/editor.jpg" alt="Editor de Kanu con un clip de dron de Bogotá" width="900">
-</p>
-
 Kanu es un editor de video para Mac, hecho para preparar clips para bancos de video de stock.
 Tú pones los videos de la cámara o del dron y Kanu los deja listos para subir:
 
@@ -25,6 +21,10 @@ Se puede trabajar clip por clip en el editor, con vista antes/después, o proces
 La guía de uso paso a paso está en [LEEME.md](LEEME.md).
 
 ## La interfaz
+
+**El editor.** A la izquierda los clips de la tanda, al centro el visor con los cortes y a la derecha los ajustes.
+
+![Editor de Kanu con un clip de dron de Bogotá](docs/img/editor.jpg)
 
 **Antes y después.** La vista *Dividido* compara el original con la corrección sobre el mismo fotograma.
 
