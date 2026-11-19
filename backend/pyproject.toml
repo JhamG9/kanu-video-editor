@@ -1,0 +1,19 @@
+[project]
+name = "kanu"
+version = "0.2.0"
+description = "Motor de Kanu: corrección de color, estabilización, manchas, cortes y exportación para video de stock."
+requires-python = ">=3.11"
+dependencies = ["numpy>=2", "fastapi>=0.115", "uvicorn[standard]>=0.30"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.27", "ruff>=0.6"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E9", "F"]

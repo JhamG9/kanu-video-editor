@@ -1,7 +1,7 @@
 """Icono de Kanu: tucán en estilo grabado fino (como una ilustración a plumilla).
 
 Solo usa numpy y ffmpeg. Genera editor/static/icon.png (1024 px).
-    python3 editor/icono/tucan.py
+    python3 tools/icono/tucan.py
 """
 import subprocess
 from pathlib import Path
@@ -10,7 +10,7 @@ import numpy as np
 
 N = 2048                      # se dibuja al doble y se reduce (antialias)
 K = N / 1024                  # las coordenadas están en espacio 1024
-OUT = Path(__file__).resolve().parent.parent / "static" / "icon.png"
+OUT = Path(__file__).resolve().parents[2] / "apps" / "legacy-ui" / "icon.png"
 FFMPEG = "/opt/homebrew/bin/ffmpeg"
 
 SHIFT = 140                   # el dibujo se hace en un lienzo más ancho y se corre a la izquierda

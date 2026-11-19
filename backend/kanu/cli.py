@@ -1,42 +1,44 @@
 """Uso desde terminal (lo usa Claude para trabajar sin abrir el editor).
 
-  python3 editor/cli.py stock [clip ...] [--rehacer] [--probar]
+  python -m kanu.cli stock [clip ...] [--rehacer] [--probar]
         TODO en un paso: corrige color, ruido, estabilización y enderezado, y exporta la versión final
         4K a "videos subir/". Sin clips: solo los que aún no tienen su final. Respeta los clips que
         ajustaste a mano (estado manual/aprobado). --probar solo muestra qué haría, sin exportar.
-  python3 editor/cli.py auto [clip ...]          corrección automática (todos si no se indica)
-  python3 editor/cli.py export PRESET [clip ...] exporta (presets: 4k_h264, 4k_hevc10, 4k_prores, 1080_h264, vertical_h264)
-  python3 editor/cli.py estado                    resumen de ajustes por clip
-  python3 editor/cli.py limpiar                   borra intermedios estabilizados y fotogramas temporales
+  python -m kanu.cli auto [clip ...]          corrección automática (todos si no se indica)
+  python -m kanu.cli export PRESET [clip ...] exporta (presets: 4k_h264, 4k_hevc10, 4k_prores, 1080_h264, vertical_h264)
+  python -m kanu.cli estado                    resumen de ajustes por clip
+  python -m kanu.cli limpiar                   borra intermedios estabilizados y fotogramas temporales
 """
 import json
 import sys
 import time
 
-import media
-import project
+from kanu import config
+from kanu.core import grade
+from kanu.infra import ffmpeg as ff
+from kanu.services import export, library
 
 
 def final_path(name):
-    return project.SUBIR / (name.rsplit(".", 1)[0] + "." + media.PRESETS["4k_h264"]["ext"])
+    return config.SUBIR / (name.rsplit(".", 1)[0] + "." + ff.PRESETS["4k_h264"]["ext"])
 
 
 def stock(names, redo=False, dry=False):
     """Flujo completo para stock. Lo usa Claude cuando le pasan una tanda nueva de videos."""
-    names = names or [n for n in project.clips() if redo or not final_path(n).exists()]
+    names = names or [n for n in library.clips() if redo or not final_path(n).exists()]
     if not names:
         print('Todos los clips ya tienen su final en "videos subir/". Usa --rehacer para repetirlos.')
         return
     rows = []
     for n in names:
         t = time.time()
-        s = project.load(n)
+        s = library.load(n)
         if s["status"] in ("manual", "aprobado"):  # tus ajustes nunca se pisan, ni con --rehacer
             nota = "ajustes tuyos (no se tocan)"
         else:
-            s = project.auto(n)
+            s = library.auto(n)
             nota = "auto"
-        i = project.clip_info(n)
+        i = library.clip_info(n)
         pl = i["plan"]
         rows.append((n, nota, s["denoise"], s["stabilize"], s.get("rotate") or 0, len(i["segments"]), pl["clip_len"],
                      pl["speed"], round(time.time() - t, 1)))
@@ -46,7 +48,7 @@ def stock(names, redo=False, dry=False):
     if dry:
         print("\n--probar: no se exportó nada.")
         return
-    ex = project.Exporter(workers=2)
+    ex = export.Exporter(workers=2)
     ex.add(names, ["4k_h264"], keep_audio=False, to_upload=True)
     t0 = time.time()
     cleaned = set()
@@ -55,7 +57,7 @@ def stock(names, redo=False, dry=False):
         pend = [j for j in jobs if j["status"] in ("en cola", "procesando", "estabilizando")]
         # cada estabilizado ocupa ~2.5 GB: se borra en cuanto su clip termina (en tandas grandes llenaría el disco)
         for c in {j["clip"] for j in jobs} - {j["clip"] for j in pend} - cleaned:
-            project.finish_clip(c)  # copia ligera estabilizada para el visor + borra el intermedio grande
+            export.finish_clip(c)  # copia ligera estabilizada para el visor + borra el intermedio grande
             cleaned.add(c)
         print(f"\rExportando: {len(jobs) - len(pend)}/{len(jobs)} listos · {int(time.time() - t0)} s", end="", flush=True)
         if not pend:
@@ -74,14 +76,14 @@ def main(argv):
         return
     cmd, rest = argv[0], argv[1:]
     if cmd == "auto":
-        for n in rest or project.clips():
+        for n in rest or library.clips():
             t = time.time()
-            s = project.auto(n)
+            s = library.auto(n)
             print(f"{n}: listo en {time.time() - t:.1f}s · ruido {s['auto']['noise']} ({s['denoise']}) · "
                   + "; ".join(s["auto"]["why"]))
     elif cmd == "export":
-        preset, names = rest[0], rest[1:] or project.clips()
-        ex = project.Exporter(workers=2)
+        preset, names = rest[0], rest[1:] or library.clips()
+        ex = export.Exporter(workers=2)
         ex.add(names, [preset])
         while True:
             jobs = ex.list()
@@ -97,12 +99,12 @@ def main(argv):
     elif cmd == "stock":
         stock([a for a in rest if not a.startswith("--")], "--rehacer" in rest, "--probar" in rest)
     elif cmd == "limpiar":
-        print(f"Liberados {project.clean_cache() / 1e9:.1f} GB")
+        print(f"Liberados {library.clean_cache() / 1e9:.1f} GB")
     elif cmd == "estado":
-        for n in project.clips():
-            i = project.clip_info(n)
+        for n in library.clips():
+            i = library.clip_info(n)
             s = i["settings"]
-            print(n, s["status"], f"{len(i['segments'])} clip(s)", json.dumps({k: s[k] for k in media.grade.COLOR_KEYS}))
+            print(n, s["status"], f"{len(i['segments'])} clip(s)", json.dumps({k: s[k] for k in grade.COLOR_KEYS}))
     else:
         print(__doc__)
 

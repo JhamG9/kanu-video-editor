@@ -1,4 +1,5 @@
-#!/bin/zsh
-cd "$(dirname "$0")"
+#!/bin/bash
+# Abre Kanu en el navegador (el motor corre en esta ventana de Terminal; ciérrala para apagarlo).
+cd "$(dirname "$0")/backend"
 echo "Abriendo Kanu…"
-/opt/homebrew/bin/python3 editor/server.py
+exec .venv/bin/python -m kanu

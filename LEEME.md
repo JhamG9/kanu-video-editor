@@ -26,7 +26,7 @@ Para cerrarlo, cierra la ventana de Terminal.
 ## Tanda nueva para stock (lo hace Claude)
 1. Copia los videos nuevos a `Videos/`.
 2. Dile a Claude: "procesa los videos nuevos para stock".
-3. Claude ejecuta `python3 editor/cli.py stock`, que hace todo en un paso con cada clip que aún no tiene su final:
+3. Claude ejecuta `cd backend && .venv/bin/python -m kanu.cli stock`, que hace todo en un paso con cada clip que aún no tiene su final:
    color natural, ruido, estabilización (la que pida cada toma, normalmente Media o Fuerte), enderezado,
    cortes de 12 a 14 s y exportación 4K H.264 sin audio a `videos subir/`.
 4. Tú revisas los finales. Si alguno no te gusta, ábrelo en el editor, ajústalo y vuelve a exportarlo.
@@ -112,10 +112,10 @@ Kanu puede aprender cómo editas tú:
 
 ## Desde la terminal
 ```
-python3 editor/cli.py stock                # tanda completa → videos subir/ (solo los nuevos)
-python3 editor/cli.py stock --probar       # muestra qué haría sin exportar
-python3 editor/cli.py auto                 # corrige todos
-python3 editor/cli.py export 4k_h264       # exporta todos (4k_hevc10, 4k_prores, 1080_h264, vertical_h264)
-python3 editor/cli.py estado
-python3 editor/cli.py limpiar              # libera el espacio de .cache
+cd backend && .venv/bin/python -m kanu.cli stock                # tanda completa → videos subir/ (solo los nuevos)
+cd backend && .venv/bin/python -m kanu.cli stock --probar       # muestra qué haría sin exportar
+.venv/bin/python -m kanu.cli auto                 # corrige todos
+.venv/bin/python -m kanu.cli export 4k_h264       # exporta todos (4k_hevc10, 4k_prores, 1080_h264, vertical_h264)
+.venv/bin/python -m kanu.cli estado
+.venv/bin/python -m kanu.cli limpiar              # libera el espacio de .cache
 ```

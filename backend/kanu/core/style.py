@@ -19,15 +19,16 @@ import time
 from pathlib import Path
 
 import numpy as np
+from kanu import config as cfg
+from kanu.core import grade
+from kanu.infra import ffmpeg as ff
+from kanu.services import library
 
-import grade
-import media
 
-ROOT = Path(__file__).resolve().parent.parent
-DIR = ROOT / "estilo"
+DIR = cfg.ESTILO
 ORIG, EDIT = DIR / "original", DIR / "editado"
 MODEL, CONFIG, LUT = DIR / "modelo.json", DIR / "config.json", DIR / "lut.cube"
-VIDEO_EXT = {".mp4", ".mov", ".mxf", ".m4v"}
+VIDEO_EXT = cfg.VIDEO_EXT
 
 # rango de búsqueda de cada control
 RANGES = {"exposure": (-1.5, 1.5, 0.4), "contrast": (-50, 60, 16), "highlights": (-100, 60, 24),
@@ -113,12 +114,12 @@ def delete(name=None):
 # ------------------------------------------------------------------ medir
 def _frames(path, meta, times, knee=True):
     w, h = 320, 180
-    fr = [media._raw_rgb(path, t, w, h, meta if knee else {}) for t in times]
+    fr = [ff._raw_rgb(path, t, w, h, meta if knee else {}) for t in times]
     return np.concatenate([f.reshape(-1, 3) for f in fr])
 
 
 def _thumbs(path, fps=1):
-    raw = media.run([media.FFMPEG, "-v", "error", "-i", str(path), "-vf", f"fps={fps},scale=32:18,format=gray",
+    raw = ff.run([config.FFMPEG, "-v", "error", "-i", str(path), "-vf", f"fps={fps},scale=32:18,format=gray",
                      "-f", "rawvideo", "-"]).stdout
     a = np.frombuffer(raw, np.uint8).reshape(-1, 18 * 32).astype(np.float32)
     a = (a - a.mean(1, keepdims=True)) / (a.std(1, keepdims=True) + 1e-3)   # sin depender del color/brillo
@@ -245,7 +246,7 @@ def _learn(ps):
             e = EDIT / p["editado"]
             if not p["original"]:                     # solo el final: se aprende su aspecto
                 try:
-                    me = media.probe(e)
+                    me = ff.probe(e)
                     px = _frames(e, me, [me["duration"] * f for f in (0.1, 0.3, 0.5, 0.7, 0.9)], knee=False)
                     out.append({"name": p["name"], "look": look(px)})
                 except Exception as ex:  # noqa
@@ -253,7 +254,7 @@ def _learn(ps):
                 continue
             o = ORIG / p["original"]
             try:
-                mo, me = media.probe(o), media.probe(e)
+                mo, me = ff.probe(o), ff.probe(e)
                 off = _align(o, e, mo, me)
                 d = min(me["duration"], mo["duration"] - off)
                 times_e = [d * f for f in (0.1, 0.25, 0.4, 0.55, 0.7, 0.85)]
@@ -277,14 +278,12 @@ def kanu_clips():
     """Clips de Kanu que ajustaste a mano o aprobaste (y la opción de aprender de ellos está activa)."""
     if not config().get("kanu", True):
         return []
-    import project   # aquí y no arriba: project también importa este módulo
-    return [n for n in project.clips() if project.load(n)["status"] in ("manual", "aprobado")]
+    return [n for n in library.clips() if library.load(n)["status"] in ("manual", "aprobado")]
 
 
 def _from_kanu(name):
-    import project
-    m, s = project.meta(name), project.load(name)
-    src = _frames(project.clip_path(name), m, [m["duration"] * f for f in (0.15, 0.35, 0.5, 0.65, 0.85)])
+    m, s = library.meta(name), library.load(name)
+    src = _frames(library.clip_path(name), m, [m["duration"] * f for f in (0.15, 0.35, 0.5, 0.65, 0.85)])
     return {"name": name, "kanu": True, "features": scene_features(src),
             "params": {k: (round(float(s.get(k) or 0), 2) if k == "exposure" else round(float(s.get(k) or 0))) for k in RANGES}}
 

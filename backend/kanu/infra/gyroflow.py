@@ -18,8 +18,7 @@ import subprocess
 import threading
 from pathlib import Path
 
-GYROFLOW = "/Applications/Gyroflow.app/Contents/MacOS/gyroflow"
-FFMPEG = "/opt/homebrew/bin/ffmpeg"
+from kanu.config import FFMPEG, GYROFLOW
 
 LEVELS = {"off": None, "suave": 0.5, "media": 1.0, "fuerte": 1.5}
 LABELS = {"off": "Apagada", "suave": "Suave", "media": "Media", "fuerte": "Fuerte"}
