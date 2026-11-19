@@ -43,7 +43,7 @@ Kanu corrige y exporta todo solo.
 
 Necesitas un Mac con Apple Silicon (M1 o más nuevo) y macOS 12 o más reciente.
 
-1. Descarga **Kanu-x.y.z.dmg** de la sección *Releases* de este repositorio y ábrelo.
+1. Descarga **Kanu-x.y.z.dmg** de [Releases](https://github.com/JhamG9/kanu-video-editor/releases) y ábrelo.
 2. Arrastra **Kanu** a **Aplicaciones**.
 3. La primera vez, macOS dirá que la app es de un desarrollador no identificado (no está firmada con una
    cuenta de Apple). Haz clic derecho en Kanu → **Abrir** → **Abrir**. Solo hace falta una vez.
@@ -63,7 +63,7 @@ brew install python ffmpeg
 ```
 
 ```bash
-git clone <url-de-este-repositorio> Kanu
+git clone https://github.com/JhamG9/kanu-video-editor.git Kanu
 ```
 
 Abre **Kanu.app** desde la carpeta `Kanu`. La primera vez tarda uno o dos minutos: crea el entorno de Python
