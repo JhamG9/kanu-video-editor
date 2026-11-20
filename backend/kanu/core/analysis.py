@@ -41,8 +41,10 @@ def noise_level(sigma):
     return "fuerte"
 
 
-def analyze(path, meta):
-    """Corrección automática natural para stock: limpia, sin look cinematográfico."""
+def analyze(path, meta, step=lambda name: None):
+    """Corrección automática natural para stock: limpia, sin look cinematográfico.
+    step(nombre) avisa en qué etapa va, para mostrar el progreso."""
+    step("luz")
     w, h = 480, 270
     frames = [ff._raw_rgb(path, meta["duration"] * f, w, h, meta) for f in (0.1, 0.3, 0.5, 0.7, 0.9)]
     px = np.concatenate([f.reshape(-1, 3) for f in frames])
@@ -148,7 +150,9 @@ def analyze(path, meta):
         s["exposure"] = 0.0
         why = [w for w in why if "subo exposición" not in w] + ["escena oscura, pero subir la exposición quemaría el cielo → la dejo"]
 
+    step("ruido")
     sigma = estimate_noise(path, meta)
+    step("vibracion")
     jit, sway = measure_jitter(path, meta)
     # Para stock la toma debe parecer de trípode: a mano casi siempre hace falta Media o más
     if jit < 0.2 and sway < 1.0:

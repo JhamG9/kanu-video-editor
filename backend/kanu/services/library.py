@@ -83,7 +83,7 @@ SEGMENT_DEFAULT = {"enabled": True, "min": 12, "max": 14, "max_slow": 1.2}
 def default_settings():
     s = dict(grade.DEFAULTS)
     s.update({"rotate": 0.0, "denoise": "off", "stabilize": "off", "stab_method": "auto", "trim_in": 0.0, "trim_out": None, "sections": [],
-              "segment": dict(SEGMENT_DEFAULT), "status": "pendiente", "auto": None, "batch": None, "spots": []})
+              "segment": dict(SEGMENT_DEFAULT), "status": "pendiente", "status_before": None, "auto": None, "batch": None, "spots": []})
     return s
 
 
@@ -123,10 +123,24 @@ def straighten(name, s=None):
     return s, f"Enderezado {ang:+.1f}° (confianza {round(conf * 100)} %)."
 
 
+# Progreso de las correcciones automáticas en curso: {clip: {"stage", "t0", "stages"}} (lo lee la interfaz)
+AUTO_STAGES = ["luz", "ruido", "vibracion", "estilo", "horizonte"]
+AUTO_PROGRESS = {}
+
+
 def auto(name, keep_status=False):
     """Corrección automática de un clip (la hace Claude, sin intervención)."""
     p, m = clip_path(name), meta(name)
-    col, lvl, sigma, why, stats, stab_level = analysis.analyze(p, m)
+    prog = AUTO_PROGRESS[name] = {"stage": "luz", "t0": time.time(), "duration": m["duration"]}
+    try:
+        return _auto(name, p, m, keep_status, lambda st: prog.update(stage=st))
+    finally:
+        AUTO_PROGRESS.pop(name, None)
+
+
+def _auto(name, p, m, keep_status, step):
+    col, lvl, sigma, why, stats, stab_level = analysis.analyze(p, m, step)
+    step("estilo")
     # tu estilo: si lo enseñaste, los colores salen de cómo editaste tus videos más parecidos
     try:
         st_pred = style.predict(style._frames(p, m, [m["duration"] * f for f in (0.15, 0.35, 0.5, 0.65, 0.85)]), col)
@@ -141,6 +155,7 @@ def auto(name, keep_status=False):
     s.update(col)
     s["denoise"] = lvl
     s["stabilize"] = stab_level
+    step("horizonte")
     s, msg = straighten(name, s)
     if abs(s.get("rotate") or 0) >= 0.3:
         why = list(why) + [msg]

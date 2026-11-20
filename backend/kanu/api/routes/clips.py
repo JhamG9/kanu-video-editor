@@ -1,4 +1,6 @@
 """Clips: lista, ajustes, corrección automática, enderezar y color."""
+import time
+
 from fastapi import APIRouter, Depends
 from fastapi.responses import Response
 
@@ -29,6 +31,13 @@ def get_clip(clip: str):
 def save_settings(clip: str, settings: dict = Depends(json_body)):
     library.save(clip, settings)
     return library.clip_info(clip)
+
+
+@router.get("/auto/progress")
+def auto_progress():
+    now = time.time()
+    return {n: {"stage": v["stage"], "elapsed": round(now - v["t0"], 1), "duration": v["duration"],
+                "stages": library.AUTO_STAGES} for n, v in list(library.AUTO_PROGRESS.items())}
 
 
 @router.post("/auto")

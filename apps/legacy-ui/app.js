@@ -278,6 +278,21 @@ function addClipCard(el, c) {
 function renderStatus() {
   const st = S.settings.status;
   $("#clipStatus").className = "status st-" + st; $("#clipStatus").textContent = st;
+  const b = $("#btnApprove"), on = st === "aprobado";
+  b.classList.toggle("on", on);
+  b.textContent = on ? "✓ Aprobado" : "✓ Aprobar";
+  b.title = on ? "Clic para quitar la aprobación (vuelve a como estaba)" : "Marcar el clip como listo: «Corregir todo» no lo toca";
+}
+// Aprobar y desaprobar con el mismo botón; al quitarlo vuelve al estado de antes (manual, auto…)
+function toggleApprove() {
+  const s = S.settings;
+  if (s.status === "aprobado") {
+    s.status = s.status_before && s.status_before !== "aprobado" ? s.status_before : (s.auto ? "auto" : "pendiente");
+    toast("Aprobación quitada");
+  } else {
+    s.status_before = s.status; s.status = "aprobado"; toast("Clip aprobado");
+  }
+  renderStatus(); scheduleSave(); renderClipListDebounced();
 }
 
 async function selectClip(name) {
@@ -485,6 +500,65 @@ function initStraighten() {
     toast(`Enderezado ${(-phi > 0 ? "+" : "") + (-phi).toFixed(1)}°`);
     setLineMode(false);
   };
+}
+
+
+// ---------------------------------------------------------------- progreso de la corrección automática
+// La corrección tarda (sobre todo medir la vibración, que recorre el video entero): una tarjeta muestra
+// en qué paso va según el motor, cuánto lleva y, con varios clips, cuánto falta.
+const AUTO_STEPS = { luz: ["Midiendo luz y color", 0.10], ruido: ["Midiendo el ruido", 0.15],
+  vibracion: ["Midiendo la vibración (recorre todo el video)", 0.50], estilo: ["Aplicando tu estilo de color", 0.12],
+  horizonte: ["Enderezando el horizonte", 0.13] };
+async function runAuto(names, onClip) {
+  const card = $("#autoCard"), keys = Object.keys(AUTO_STEPS), out = [];
+  const t0 = Date.now(); let stage = "luz", stageT = Date.now(), cur = 0;
+  $("#acSteps").innerHTML = keys.map((k) => `<li data-k="${k}">${AUTO_STEPS[k][0]}</li>`).join("");
+  card.classList.remove("hidden");
+  const draw = () => {
+    const n = names.length, i = keys.indexOf(stage);
+    for (const li of $("#acSteps").children) {
+      const j = keys.indexOf(li.dataset.k);
+      li.className = j < i ? "done" : j === i ? "now" : "";
+    }
+    // dentro de una etapa la barra avanza despacio hacia su final, sin pasarse
+    const before = keys.slice(0, i).reduce((a, k) => a + AUTO_STEPS[k][1], 0);
+    const inStage = AUTO_STEPS[stage][1] * (1 - Math.exp(-(Date.now() - stageT) / 9000));
+    $("#acBar").style.width = (100 * (cur + before + inStage) / n).toFixed(1) + "%";
+    const secs = Math.round((Date.now() - t0) / 1000);
+    $("#acTime").textContent = secs < 60 ? `${secs} s` : `${Math.floor(secs / 60)} min ${secs % 60} s`;
+    $("#acTitle").textContent = n > 1 ? `Corrigiendo clip ${cur + 1} de ${n}` : "Corrigiendo con ✦ Auto";
+    $("#acClip").textContent = names[cur];
+    let note = "Puedes seguir mirando otros clips mientras tanto.";
+    if (n > 1 && cur > 0) {
+      const left = Math.round((Date.now() - t0) / cur * (n - cur) / 1000);
+      note = `Quedan unos ${left < 90 ? left + " s" : Math.round(left / 60) + " min"}. ` + note;
+    } else if (n > 1) note = `Unos 30–40 s por clip. ` + note;
+    else note = "Suele tardar 30–40 s. " + note;
+    $("#acNote").textContent = note;
+    $("#panel").classList.toggle("busy", names[cur] === S.cur);   // no se toca el clip que se está corrigiendo
+  };
+  const poll = setInterval(async () => {
+    try {
+      const p = (await (await api("/api/auto/progress")).json())[names[cur]];
+      if (p && p.stage !== stage) { stage = p.stage; stageT = Date.now(); }
+    } catch {}
+    draw();
+  }, 500);
+  try {
+    for (cur = 0; cur < names.length; cur++) {
+      stage = "luz"; stageT = Date.now(); onClip(cur, names.length); draw();
+      try { out.push(await (await api(`/api/auto?clip=${encodeURIComponent(names[cur])}`, { method: "POST" })).json()); }
+      catch (e) { if (names.length === 1) throw e; toast(`${names[cur]}: ${e.message}`); }
+      const info = out[out.length - 1];
+      if (info && names.length > 1) {                       // la lista se va actualizando clip a clip
+        const k = S.clips.findIndex((c) => c.name === info.name); if (k >= 0) S.clips[k] = info;
+        if (info.name === S.cur) { applyInfo(info, true); refreshLut(); } else renderClipListDebounced();
+      }
+    }
+  } finally {
+    clearInterval(poll); $("#panel").classList.remove("busy"); card.classList.add("hidden");
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------- panel
@@ -1040,9 +1114,13 @@ function bind() {
   for (const id of ["#segOn", "#segMin", "#segMax", "#segSlow"]) $(id).onchange = segChanged;
 
   $("#btnAuto").onclick = async () => {
+    const name = S.cur;
     $("#btnAuto").disabled = true; $("#btnAuto").textContent = "Analizando…";
-    try { applyInfo(await (await api(`/api/auto?clip=${encodeURIComponent(S.cur)}`, { method: "POST" })).json(), true); refreshLut(); }
-    catch (e) { toast("Error: " + e.message); }
+    try {
+      const info = await runAuto([name], () => {});
+      if (info[0] && S.cur === name) { applyInfo(info[0], true); refreshLut(); }
+      toast("✦ Listo: corrección automática aplicada");
+    } catch (e) { toast("Error: " + e.message); }
     $("#btnAuto").disabled = false; $("#btnAuto").textContent = "✦ Auto";
   };
   initStraighten();
@@ -1053,7 +1131,7 @@ function bind() {
     for (const k of COLOR_KEYS) S.settings[k] = 0;
     S.settings.denoise = "off"; markManual(); renderPanel(); refreshLut(); scheduleSave();
   };
-  $("#btnApprove").onclick = () => { S.settings.status = "aprobado"; renderStatus(); scheduleSave(); toast("Clip aprobado"); };
+  $("#btnApprove").onclick = toggleApprove;
   $("#btnCopy").onclick = () => {
     S.clipboard = Object.fromEntries([...COLOR_KEYS, "denoise"].map((k) => [k, S.settings[k]]));
     $("#btnPaste").disabled = false; toast("Ajustes copiados");
@@ -1079,10 +1157,7 @@ function bind() {
     if (!confirm(`Corregir automáticamente ${todo.length} clip${todo.length > 1 ? "s" : ""}?` +
       (kept ? `\n${kept} con ajustes tuyos o aprobados no se tocan.` : ""))) return;
     const b = $("#btnAutoAll"); b.disabled = true;
-    for (let i = 0; i < todo.length; i++) {
-      b.textContent = `✦ Analizando ${i + 1}/${todo.length}…`;
-      try { await api(`/api/auto?clip=${encodeURIComponent(todo[i].name)}`, { method: "POST" }); } catch (e) { toast(e.message); }
-    }
+    await runAuto(todo.map((c) => c.name), (i, n) => { b.textContent = `✦ Analizando ${i + 1}/${n}…`; });
     b.disabled = false; b.textContent = "✦ Corregir todo";
     await reloadClips(); await selectClip(S.cur);
     toast(`${todo.length} clip${todo.length > 1 ? "s" : ""} corregido${todo.length > 1 ? "s" : ""}${kept ? ` · ${kept} tuyos sin tocar` : ""}`);

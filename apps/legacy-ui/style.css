@@ -485,3 +485,29 @@ button.glass small { color: var(--tx2); font-weight: 400; }
 .zone { margin-bottom: 10px; }
 .zone-h { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
 .zone-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--line); }
+
+/* ---------------------------------------------------------------- progreso de la corrección automática */
+.auto-card { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 50; width: min(380px, calc(100vw - 32px));
+  background: var(--bg2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.45); font-size: 12px; animation: acIn .2s ease-out; }
+.auto-card.hidden { display: none; }
+@keyframes acIn { from { opacity: 0; transform: translate(-50%, 8px); } }
+.ac-top { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.ac-time { margin-left: auto; color: var(--tx2); font-variant-numeric: tabular-nums; }
+.ac-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--acc); animation: acSpin .8s linear infinite; }
+@keyframes acSpin { to { transform: rotate(360deg); } }
+.ac-clip { color: var(--tx2); margin: 3px 0 8px 22px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ac-steps { list-style: none; margin: 0 0 10px; padding: 0 0 0 22px; display: grid; gap: 3px; }
+.ac-steps li { color: var(--tx2); opacity: .55; }
+.ac-steps li::before { content: "○"; display: inline-block; width: 16px; }
+.ac-steps li.now { color: var(--tx); opacity: 1; }
+.ac-steps li.now::before { content: "◐"; color: var(--acc); }
+.ac-steps li.done { opacity: .8; }
+.ac-steps li.done::before { content: "✓"; color: #6fcf8b; }
+.ac-bar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.ac-bar > div { height: 100%; width: 0; background: var(--acc); transition: width .5s ease; }
+.ac-note { margin-top: 7px; color: var(--tx2); }
+.panel.busy { opacity: .45; pointer-events: none; transition: opacity .2s; }
+@media (prefers-reduced-motion: reduce) { .ac-spin { animation: none; } .auto-card { animation: none; } }
+#btnApprove.on { background: rgba(111, 207, 139, .16); border-color: #3f8f5a; color: #8be0a4; }
+#btnApprove.on:hover { background: rgba(207, 111, 111, .12); border-color: #8f3f3f; color: #e09a9a; }

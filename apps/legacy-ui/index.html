@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kanu</title>
 <link rel="icon" type="image/png" href="/static/icon.png?v=6">
-<link rel="stylesheet" href="/static/style.css?v=10">
+<link rel="stylesheet" href="/static/style.css?v=11">
 </head>
 <body>
 <header>
@@ -410,6 +410,13 @@
 </div>
 
 <div id="toast" class="toast hidden"></div>
-<script src="/static/app.js?v=11"></script>
+<div id="autoCard" class="auto-card hidden" role="status" aria-live="polite">
+  <div class="ac-top"><span class="ac-spin"></span><b id="acTitle">Corrigiendo…</b><span id="acTime" class="ac-time"></span></div>
+  <div id="acClip" class="ac-clip"></div>
+  <ol id="acSteps" class="ac-steps"></ol>
+  <div class="ac-bar"><div id="acBar"></div></div>
+  <div id="acNote" class="ac-note"></div>
+</div>
+<script src="/static/app.js?v=12"></script>
 </body>
 </html>
