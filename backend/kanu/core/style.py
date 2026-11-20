@@ -215,7 +215,59 @@ def fit_pair(src, dst):
             best = (params, l)
     params = best[0]
     rounded = {k: (round(v, 2) if k == "exposure" else round(v)) for k, v in params.items()}
-    return rounded, _loss(params, src, target, reg=False)
+    loss = _loss(params, src, target, reg=False)
+    rounded.update(fit_hsl(src, dst, params))
+    return rounded, loss
+
+
+# ------------------------------------------------------------------ por color (HSL)
+def hue_stats(px):
+    """Por cada gama de color: cuánto ocupa, su saturación y su brillo medios (solo píxeles con color)."""
+    h, s, v = grade._rgb2hsv(px)
+    w = grade.hue_weights(h) * np.clip((s * v - 0.04) / 0.10, 0, 1)[:, None]
+    tot = w.sum(0) + 1e-9
+    return tot / len(px), (w * s[:, None]).sum(0) / tot, (w * v[:, None]).sum(0) / tot
+
+
+def fit_hsl(src, dst, base):
+    """Después de los ajustes globales: lo que tu edición cambia en cada gama de color por separado
+    (p. ej. subir solo los rosados). Devuelve solo las gamas que de verdad cambiaste."""
+    rng = np.random.default_rng(1)
+    if len(src) > 8000:
+        src = src[rng.choice(len(src), 8000, replace=False)]
+    s0 = dict(grade.DEFAULTS)
+    s0.update(base)
+    g = grade.apply(src, s0)
+    share_o, sat_t, val_t = hue_stats(dst)
+    share_g, _, _ = hue_stats(g)
+    cols = [i for i, c in enumerate(grade.HSL_COLORS) if share_g[i] > 0.03 and share_o[i] > 0.03]
+    if not cols:
+        return {}
+    keys = [f"hsl_{c}_{p}" for i, c in enumerate(grade.HSL_COLORS) if i in cols for p in ("s",)]   # la luminancia por gama se confunde con el cielo y las nubes
+
+    def loss(p):
+        s = {k: 0.0 for k in grade.HSL_KEYS}
+        s.update(p)
+        _, sat, val = hue_stats(grade._hsl(g, s))
+        # una gama que ocupa poco pesa menos; y se prefiere mover poco (los cambios grandes deben valer la pena)
+        return float(sum(min(1.0, (share_g[i] / 0.15) ** 0.5) * (sat[i] - sat_t[i]) ** 2 * 40
+                         for i in cols)) + 0.004 * sum((v / 50) ** 2 for v in p.values())
+
+    p, step = {k: 0.0 for k in keys}, 20.0
+    best = loss(p)
+    while step >= 2.5:
+        improved = False
+        for k in keys:
+            for d in (step, -step):
+                t = dict(p)
+                t[k] = float(np.clip(p[k] + d, -50, 50))
+                l = loss(t)
+                if l < best - 1e-7:
+                    best, p, improved = l, t, True
+                    break
+        if not improved:
+            step /= 2
+    return {k: round(v) for k, v in p.items() if abs(v) >= 5}
 
 
 # ------------------------------------------------------------------ aprender
@@ -294,7 +346,7 @@ def _from_kanu(name):
     m, s = library.meta(name), library.load(name)
     src = _frames(library.clip_path(name), m, [m["duration"] * f for f in (0.15, 0.35, 0.5, 0.65, 0.85)])
     return {"name": name, "kanu": True, "features": scene_features(src),
-            "params": {k: (round(float(s.get(k) or 0), 2) if k == "exposure" else round(float(s.get(k) or 0))) for k in RANGES}}
+            "params": {k: (round(float(s.get(k) or 0), 2) if k == "exposure" else round(float(s.get(k) or 0))) for k in list(RANGES) + grade.HSL_KEYS}}
 
 
 # ------------------------------------------------------------------ aplicar
@@ -319,10 +371,11 @@ def predict(px, base=None):
         w /= w.sum()
         # confianza: con pocos ejemplos o escenas muy distintas, se mezcla con la corrección automática
         alpha = len(ps) / (len(ps) + 4) * float(np.exp(-d[idx[0]] / 6))
-        b = {k: float((base or {}).get(k, 0) or 0) for k in RANGES}
+        keys = list(RANGES) + grade.HSL_KEYS                  # también lo que haces por color
+        b = {k: float((base or {}).get(k, 0) or 0) for k in keys}
         out = {}
-        for key in RANGES:
-            v = float(sum(wi * ps[i]["params"][key] for wi, i in zip(w, idx)))
+        for key in keys:
+            v = float(sum(wi * ps[i]["params"].get(key, 0) for wi, i in zip(w, idx)))
             v = b[key] + alpha * (v - b[key])
             out[key] = round(v, 2) if key == "exposure" else round(v)
         return out, [ps[i]["name"] for i in idx]

@@ -28,7 +28,14 @@ const SLIDERS = {
     ["saturation", "Saturación", -100, 100, 1],
   ],
 };
-const COLOR_KEYS = [...SLIDERS.light, ...SLIDERS.color].map((s) => s[0]);
+// Por color (HSL): 8 gamas, mismo orden y centros (grados) que grade.HSL_COLORS en el motor
+const HSL = [["red", "Rojos", 0], ["orange", "Naranjas", 30], ["yellow", "Amarillos", 60], ["green", "Verdes", 120],
+  ["aqua", "Aguamarinas", 180], ["blue", "Azules", 225], ["purple", "Morados", 270], ["magenta", "Magentas", 315]];
+const ZONES = [["shadows", "Sombras"], ["mid", "Medios tonos"], ["high", "Luces"]];
+const HSL_KEYS = HSL.flatMap(([c]) => ["h", "s", "l"].map((p) => `hsl_${c}_${p}`));
+const ZONE_KEYS = ZONES.flatMap(([z]) => [`zone_${z}_hue`, `zone_${z}_sat`]);
+const COLOR_KEYS = [...SLIDERS.light, ...SLIDERS.color].map((s) => s[0]).concat(HSL_KEYS, ZONE_KEYS);
+const hueCss = (h, s = 75, l = 55) => `hsl(${((h % 360) + 360) % 360} ${s}% ${l}%)`;
 
 // ---------------------------------------------------------------- WebGL
 class Renderer {
@@ -481,31 +488,87 @@ function initStraighten() {
 }
 
 // ---------------------------------------------------------------- panel
+function addSlider(host, [key, label, min, max, step, cls], track) {
+  const d = document.createElement("div");
+  d.className = "sl " + (cls || "");
+  d.innerHTML = `<div class="sl-top"><span>${label}</span><span class="v" id="v_${key}"></span></div>
+    <input type="range" id="s_${key}" min="${min}" max="${max}" step="${step}">`;
+  host.appendChild(d);
+  const inp = d.querySelector("input");
+  if (track) inp.style.background = track;
+  const set = (v) => { S.settings[key] = v; inp.value = v; showVal(key); markManual(); refreshLut(); scheduleSave(); };
+  inp.oninput = () => set(parseFloat(inp.value));
+  inp.ondblclick = () => set(0);
+  d.querySelector(".v").onclick = () => {
+    const v = prompt(label, S.settings[key]);
+    if (v === null || isNaN(parseFloat(v))) return;
+    set(Math.min(max, Math.max(min, parseFloat(v))));
+  };
+  return d;
+}
+
+let hslCur = "red";
 function buildSliders() {
-  for (const [group, list] of Object.entries(SLIDERS)) {
-    const host = group === "light" ? $("#slLight") : $("#slColor");
-    for (const [key, label, min, max, step, cls] of list) {
-      const d = document.createElement("div");
-      d.className = "sl " + (cls || "");
-      d.innerHTML = `<div class="sl-top"><span>${label}</span><span class="v" id="v_${key}"></span></div>
-        <input type="range" id="s_${key}" min="${min}" max="${max}" step="${step}">`;
-      host.appendChild(d);
-      const inp = d.querySelector("input");
-      inp.oninput = () => { S.settings[key] = parseFloat(inp.value); showVal(key); markManual(); refreshLut(); scheduleSave(); };
-      inp.ondblclick = () => { S.settings[key] = 0; inp.value = 0; showVal(key); markManual(); refreshLut(); scheduleSave(); };
-      d.querySelector(".v").onclick = () => {
-        const v = prompt(label, S.settings[key]);
-        if (v === null || isNaN(parseFloat(v))) return;
-        S.settings[key] = Math.min(max, Math.max(min, parseFloat(v))); inp.value = S.settings[key];
-        showVal(key); markManual(); refreshLut(); scheduleSave();
-      };
-    }
+  for (const s of SLIDERS.light) addSlider($("#slLight"), s);
+  for (const s of SLIDERS.color) addSlider($("#slColor"), s);
+
+  // Por color: se elige la gama con las muestras y se mueven sus tres controles
+  for (const [c, label, h] of HSL) {
+    const b = document.createElement("button");
+    b.className = "sw"; b.dataset.c = c; b.title = label; b.style.background = hueCss(h);
+    b.onclick = () => showHsl(c);
+    $("#hslSw").appendChild(b);
+    const g = document.createElement("div");
+    g.className = "hsl-g"; g.dataset.c = c;
+    $("#slHsl").appendChild(g);
+    addSlider(g, [`hsl_${c}_h`, `Tono · ${label.toLowerCase()}`, -100, 100, 1],
+      `linear-gradient(90deg, ${hueCss(h - 30)}, ${hueCss(h)} 50%, ${hueCss(h + 30)})`);
+    addSlider(g, [`hsl_${c}_s`, "Saturación", -100, 100, 1],
+      `linear-gradient(90deg, ${hueCss(h, 0, 50)}, ${hueCss(h, 90)})`);
+    addSlider(g, [`hsl_${c}_l`, "Luminancia", -100, 100, 1],
+      `linear-gradient(90deg, ${hueCss(h, 70, 18)}, ${hueCss(h, 75, 50)} 50%, ${hueCss(h, 80, 82)})`);
+  }
+  const reset = document.createElement("button");
+  reset.className = "small hsl-reset"; reset.textContent = "Restablecer colores";
+  reset.title = "Pone en cero los ajustes de las 8 gamas";
+  reset.onclick = () => { for (const k of HSL_KEYS) S.settings[k] = 0; markManual(); renderPanel(); refreshLut(); scheduleSave(); };
+  $("#slHsl").appendChild(reset);
+  showHsl(hslCur);
+
+  // Por zonas: teñir sombras, medios y luces con un tono
+  const rainbow = `linear-gradient(90deg, ${[0, 60, 120, 180, 240, 300, 360].map((h) => hueCss(h)).join(",")})`;
+  for (const [z, label] of ZONES) {
+    const g = document.createElement("div");
+    g.className = "zone"; g.innerHTML = `<div class="zone-h"><span class="zone-dot" id="zd_${z}"></span>${label}</div>`;
+    $("#slZones").appendChild(g);
+    addSlider(g, [`zone_${z}_hue`, "Tono", 0, 360, 1], rainbow);
+    addSlider(g, [`zone_${z}_sat`, "Cantidad", 0, 100, 1]);
   }
 }
+function showHsl(c) {
+  hslCur = c;
+  for (const b of document.querySelectorAll("#hslSw .sw")) b.classList.toggle("on", b.dataset.c === c);
+  for (const g of document.querySelectorAll("#slHsl .hsl-g")) g.classList.toggle("hidden", g.dataset.c !== c);
+}
 function showVal(key) {
-  const v = S.settings[key], el = $("#v_" + key);
-  el.textContent = key === "exposure" ? (v > 0 ? "+" : "") + v.toFixed(2) + " EV" : (v > 0 ? "+" : "") + Math.round(v);
-  el.classList.toggle("changed", Math.abs(v) > 1e-6);
+  const v = S.settings[key] || 0, el = $("#v_" + key);
+  if (key.endsWith("_hue")) {                                   // tono de una zona: en grados, con muestra
+    el.textContent = Math.round(v) + "°";
+    const z = key.slice(5, -4), sat = S.settings[`zone_${z}_sat`] || 0;
+    el.classList.toggle("changed", sat > 0);
+  } else {
+    el.textContent = key === "exposure" ? (v > 0 ? "+" : "") + v.toFixed(2) + " EV" : (v > 0 ? "+" : "") + Math.round(v);
+    el.classList.toggle("changed", Math.abs(v) > 1e-6);
+  }
+  if (key.startsWith("zone_")) {
+    const z = key.split("_")[1], sat = S.settings[`zone_${z}_sat`] || 0, dot = $("#zd_" + z);
+    if (dot) dot.style.background = sat > 0 ? hueCss(S.settings[`zone_${z}_hue`] || 0, 20 + sat * 0.7) : "transparent";
+    if (key.endsWith("_sat")) showVal(`zone_${z}_hue`);
+  }
+  if (key.startsWith("hsl_")) {                                 // punto en la muestra si esa gama tiene cambios
+    const c = key.split("_")[1], b = document.querySelector(`#hslSw .sw[data-c="${c}"]`);
+    if (b) b.classList.toggle("mod", ["h", "s", "l"].some((p) => Math.abs(S.settings[`hsl_${c}_${p}`] || 0) > 1e-6));
+  }
 }
 
 function renderPanel() {
@@ -1293,6 +1356,10 @@ function renderSummaries() {
   set("Enderezar", Math.abs(r) > 0.001 ? `${r > 0 ? "+" : ""}${r.toFixed(1)}°` : "derecho");
   set("Manchas del sensor", (s.spots || []).length ? `${s.spots.length} marcada${s.spots.length > 1 ? "s" : ""}` : "ninguna");
   for (const k of ["Luz", "Color"]) { const n = changed(k); set(k, n ? `${n} ajuste${n > 1 ? "s" : ""}` : "sin cambios"); }
+  const hs = HSL.filter(([c]) => ["h", "s", "l"].some((p) => Math.abs(s[`hsl_${c}_${p}`] || 0) > 1e-6)).map(([, l]) => l.toLowerCase());
+  set("Por color", hs.length ? (hs.length > 2 ? `${hs.length} gamas` : hs.join(" y ")) : "sin cambios");
+  const zs = ZONES.filter(([z]) => (s[`zone_${z}_sat`] || 0) > 0).map(([, l]) => l.toLowerCase());
+  set("Por zonas", zs.length ? zs.join(", ") : "sin cambios");
   set("Ruido", S.denoiseLabels[s.denoise] || s.denoise);
   const n = S.info.segments.length;
   set("Cortes para stock", `${n} clip${n > 1 ? "s" : ""} de ${S.info.plan.clip_len.toFixed(1)} s`);

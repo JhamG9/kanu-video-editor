@@ -20,7 +20,22 @@ DEFAULTS = {
     "saturation": 0,
 }
 
+# Ajustes por color (HSL, como el mezclador de Lightroom): 8 gamas × tono / saturación / luminancia.
+# Cada gama tiene su centro de tono en grados; entre dos centros se reparte suavemente.
+HSL_COLORS = {"red": 0, "orange": 30, "yellow": 60, "green": 120, "aqua": 180, "blue": 225,
+              "purple": 270, "magenta": 315}
+for _c in HSL_COLORS:
+    for _p in ("h", "s", "l"):
+        DEFAULTS[f"hsl_{_c}_{_p}"] = 0       # -100..100
+# Color por zonas (sombras / medios / luces): tono 0..360 y cuánto se tiñe 0..100.
+ZONES = ("shadows", "mid", "high")
+for _z in ZONES:
+    DEFAULTS[f"zone_{_z}_hue"] = 0
+    DEFAULTS[f"zone_{_z}_sat"] = 0
+
 COLOR_KEYS = list(DEFAULTS.keys())
+HSL_KEYS = [k for k in COLOR_KEYS if k.startswith("hsl_")]
+ZONE_KEYS = [k for k in COLOR_KEYS if k.startswith("zone_")]
 
 
 def color_settings(settings):
@@ -60,6 +75,71 @@ def apply(rgb, s):
     chroma = np.clip(rgb.max(axis=-1) - rgb.min(axis=-1), 0, 1)
     f = (1 + s["saturation"] / 100.0) * (1 + 0.7 * s["vibrance"] / 100.0 * (1 - np.clip(chroma * 2.2, 0, 1)))
     rgb = Y2[..., None] + (rgb - Y2[..., None]) * f[..., None]
+    rgb = np.clip(rgb, 0.0, 1.0)
+
+    # 4) Por color (HSL) y 5) por zonas: solo si hay algo movido
+    if any(s[k] for k in HSL_KEYS):
+        rgb = _hsl(rgb, s)
+    if any(s[f"zone_{z}_sat"] for z in ZONES):
+        rgb = _zones(rgb, s)
+    return rgb
+
+
+def _rgb2hsv(rgb):
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    v = rgb.max(-1)
+    c = v - rgb.min(-1)
+    safe = np.where(c > 1e-9, c, 1.0)
+    h = np.where(v == r, ((g - b) / safe) % 6, np.where(v == g, (b - r) / safe + 2, (r - g) / safe + 4)) * 60.0
+    h = np.where(c > 1e-9, h, 0.0)
+    s = np.where(v > 1e-9, c / np.where(v > 1e-9, v, 1.0), 0.0)
+    return h, s, v
+
+
+def _hsv2rgb(h, s, v):
+    k = lambda n: (n + h / 60.0) % 6                                          # noqa: E731
+    f = lambda n: v - v * s * np.clip(np.minimum(k(n), 4 - k(n)), 0, 1)        # noqa: E731
+    return np.stack([f(5), f(3), f(1)], -1)
+
+
+def hue_weights(h):
+    """Peso (0..1) de cada gama de HSL_COLORS para cada tono h (grados). Suman 1."""
+    cs = list(HSL_COLORS.values())
+    n = len(cs)
+    w = []
+    for i, c in enumerate(cs):
+        prev, nxt = cs[i - 1] - (360 if i == 0 else 0), cs[(i + 1) % n] + (360 if i == n - 1 else 0)
+        d = (h - c + 180) % 360 - 180                                          # distancia con signo
+        gap = np.where(d < 0, c - prev, nxt - c)
+        w.append(np.clip(1 - np.abs(d) / gap, 0, 1))
+    return np.stack(w, -1)
+
+
+def _hsl(rgb, s):
+    h, sat, v = _rgb2hsv(rgb)
+    w = hue_weights(h)
+    chroma = sat * v
+    wc = np.clip((chroma - 0.02) / 0.10, 0, 1)                    # los grises no cambian
+    get = lambda p: np.array([s[f"hsl_{c}_{p}"] for c in HSL_COLORS]) / 100.0   # noqa: E731
+    dh = (w @ get("h")) * 30.0 * wc                                 # hasta ±30° hacia la gama vecina
+    ds = (w @ get("s")) * wc
+    dl = (w @ get("l")) * wc
+    sat = np.clip(sat * (1 + ds), 0, 1)
+    out = _hsv2rgb((h + dh) % 360, sat, v)
+    out = out * (2.0 ** (0.9 * dl))[..., None]                      # luminancia de ese color
+    return np.clip(out, 0.0, 1.0)
+
+
+def _zones(rgb, s):
+    Y = np.clip(rgb @ np.array([0.2126, 0.7152, 0.0722]), 0, 1)
+    ws = {"shadows": (1 - Y) ** 2, "mid": 2 * Y * (1 - Y), "high": Y ** 2}
+    for z in ZONES:
+        a = s[f"zone_{z}_sat"] / 100.0
+        if not a:
+            continue
+        tint = _hsv2rgb(np.array(s[f"zone_{z}_hue"] % 360), np.array(1.0), np.array(1.0))
+        tint = tint - tint @ np.array([0.2126, 0.7152, 0.0722])    # solo color, sin cambiar la luz
+        rgb = rgb + (ws[z] * a * 0.16)[..., None] * tint
     return np.clip(rgb, 0.0, 1.0)
 
 

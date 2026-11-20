@@ -471,3 +471,17 @@ button.glass small { color: var(--tx2); font-weight: 400; }
   .hero-toucan { display: none; } .hero h1 { font-size: 32px; }
 }
 @media (prefers-reduced-motion: reduce) { .hero-bg, .home-wrap, .tip.swap { animation: none; } }
+
+/* ---------------------------------------------------------------- por color (HSL) y por zonas */
+.hsl-sw { display: flex; gap: 6px; margin: 2px 0 10px; }
+.hsl-sw .sw { position: relative; flex: 1; height: 20px; min-width: 0; padding: 0; border-radius: 50%; aspect-ratio: 1; max-width: 22px;
+  border: 2px solid transparent; cursor: pointer; opacity: .8; }
+.hsl-sw .sw:hover { opacity: 1; }
+.hsl-sw .sw.on { border-color: #fff; opacity: 1; box-shadow: 0 0 0 1px rgba(0,0,0,.5); }
+.hsl-sw .sw.mod::after { content: ""; position: absolute; left: 50%; bottom: -7px; width: 4px; height: 4px; margin-left: -2px;
+  border-radius: 50%; background: var(--acc); }
+.hsl-g.hidden { display: none; }
+.hsl-reset { margin-top: 2px; }
+.zone { margin-bottom: 10px; }
+.zone-h { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+.zone-dot { width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--line); }
