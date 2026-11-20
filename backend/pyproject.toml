@@ -1,6 +1,6 @@
 [project]
 name = "kanu"
-version = "0.3.0"
+version = "0.4.0"
 description = "Motor de Kanu: corrección de color, estabilización, manchas, cortes y exportación para video de stock."
 requires-python = ">=3.11"
 dependencies = ["numpy>=2", "fastapi>=0.115", "uvicorn[standard]>=0.30"]

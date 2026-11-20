@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/JhamG9/kanu-video-editor/releases/download/v0.3.0/Kanu-0.3.0.dmg"><b>⬇ Descargar Kanu 0.3.0 para Mac</b></a>
+  <a href="https://github.com/JhamG9/kanu-video-editor/releases/download/v0.4.0/Kanu-0.4.0.dmg"><b>⬇ Descargar Kanu 0.4.0 para Mac</b></a>
   (Apple Silicon, 109 MB) · <a href="#instalar">Cómo instalar</a>
 </p>
 
@@ -52,7 +52,7 @@ Kanu corrige y exporta todo solo.
 
 Necesitas un Mac con Apple Silicon (M1 o más nuevo) y macOS 12 o más reciente.
 
-1. Descarga **[Kanu-0.3.0.dmg](https://github.com/JhamG9/kanu-video-editor/releases/download/v0.3.0/Kanu-0.3.0.dmg)**
+1. Descarga **[Kanu-0.4.0.dmg](https://github.com/JhamG9/kanu-video-editor/releases/download/v0.4.0/Kanu-0.4.0.dmg)**
    y ábrelo. Las versiones anteriores y las notas de cada una están en
    [Releases](https://github.com/JhamG9/kanu-video-editor/releases).
 2. Arrastra **Kanu** a **Aplicaciones**.
