@@ -1,6 +1,7 @@
 # Datos del usuario (videos, finales, ajustes, estilo aprendido): nunca van al repositorio
 /Videos/
 /videos subir/
+/preferencias.json
 /Exportados/
 /ajustes/
 /estilo/

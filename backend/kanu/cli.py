@@ -20,7 +20,10 @@ from kanu.services import export, library
 
 
 def final_path(name):
-    return config.SUBIR / (name.rsplit(".", 1)[0] + "." + ff.PRESETS["4k_h264"]["ext"])
+    """Final del clip (o de su primer tramo si se partió en varios)."""
+    stem, ext = name.rsplit(".", 1)[0], ff.PRESETS["4k_h264"]["ext"]
+    one = config.subir_dir() / f"{stem}{config.FINAL_TAG}.{ext}"
+    return one if one.exists() else config.subir_dir() / f"{stem}_01{config.FINAL_TAG}.{ext}"
 
 
 def stock(names, redo=False, dry=False):

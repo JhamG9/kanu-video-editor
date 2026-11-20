@@ -18,13 +18,14 @@ def _videos(folder: Path):
 
 @router.get("/home")
 def home():
-    finals = sorted(_videos(config.SUBIR), key=lambda p: p.stat().st_mtime, reverse=True)
+    finals = sorted(_videos(config.subir_dir()), key=lambda p: p.stat().st_mtime, reverse=True)
     names = set(library.clips())
     edited = [(f.stat().st_mtime, f.stem) for f in config.AJUSTES.glob("*.json")]
     last = next((n for _, stem in sorted(edited, reverse=True)
                  for n in names if Path(n).stem == stem), None)
     return {
         "version": __version__,
+        "export_dir": str(config.subir_dir()),
         "finals": {
             "count": len(finals),
             "bytes": sum(p.stat().st_size for p in finals),

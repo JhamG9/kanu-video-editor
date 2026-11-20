@@ -966,6 +966,8 @@ function openExport() {
   for (const [k, label] of Object.entries(S.presets))
     pr.insertAdjacentHTML("beforeend", `<label class="check"><input type="checkbox" value="${k}" ${k === "4k_h264" ? "checked" : ""}> ${label}</label>`);
   $("#exportModal").classList.remove("hidden");
+  loadExportDir();
+  $("#exDirChange").onclick = (e) => { e.preventDefault(); chooseExportDir(); };
   updateExSummary();
 }
 function updateExSummary() {
@@ -1373,7 +1375,7 @@ function renderBatchState(st) {
     setProgress({ title: "Estabilizando y exportando en 4K…", stage: `${st.done} de ${st.total} clips listos`,
       detail: "Puedes seguir trabajando: el avance se ve arriba", frac: 0.25 + 0.75 * (st.done / Math.max(1, st.total)) });
   else if (st.stage === "error") setProgress({ title: "La tanda se detuvo", error: st.error || "Error desconocido" });
-  else setProgress({ title: "¡Tanda lista!", stage: `${st.total} clip${st.total > 1 ? "s" : ""} en «videos subir»`,
+  else setProgress({ title: "¡Tanda lista!", stage: `${st.total} clip${st.total > 1 ? "s" : ""} en «${folderName(S.exportDir) || "videos subir"}»`,
       detail: st.errors ? `${st.errors} con error: revisa la Cola` : "Revísalos en la lista de la izquierda", frac: 1, done: true });
 }
 function watchBatch() {
@@ -1385,7 +1387,7 @@ function watchBatch() {
     if (!st.running) {
       clearInterval(B.timer); B.timer = null; BP.phase = null;
       await reloadClips(); if (S.cur) await selectClip(S.cur);
-      if (st.stage === "listo") toast(`Tanda «${st.title}» lista en «videos subir»`, 5000);
+      if (st.stage === "listo") toast(`Tanda «${st.title}» lista en «${folderName(S.exportDir) || "videos subir"}»`, 5000);
     }
   };
   B.timer = setInterval(poll, 1500); poll();
@@ -1440,9 +1442,37 @@ function renderSummaries() {
   set("Estabilización", (S.stabLevels || {})[s.stabilize] || s.stabilize);
 }
 
+// ---------------------------------------------------------------- carpeta de exportación
+const shortPath = (p) => (p || "").replace(/^\/Users\/[^/]+/, "~");
+const folderName = (p) => (p || "").replace(/\/+$/, "").split("/").pop() || p;
+function renderExportDir(d) {
+  if (!d || d.error) return;
+  S.exportDir = d.path;
+  const el = $("#setExDir");
+  if (el) { el.innerHTML = `<span dir="ltr">${esc(shortPath(d.path))}</span>`; el.title = d.path; }
+  $("#setExReset")?.classList.toggle("hidden", !d.custom);
+  const nm = $("#exDirName");
+  if (nm) { nm.textContent = folderName(d.path); nm.title = d.path; }
+}
+async function refreshHome() {
+  if (!document.body.classList.contains("at-home")) return;
+  try { HM.data = await (await api("/api/home")).json(); renderHome(); } catch { /* sin datos */ }
+}
+async function loadExportDir() { renderExportDir(await (await api("/api/export-dir")).json()); }
+async function chooseExportDir() {
+  toast("Elige la carpeta en la ventana de Mac…", 2500);
+  const r = await api("/api/export-dir/choose", { method: "POST" });
+  const d = await r.json();
+  if (!r.ok) { toast(d.error || "No se pudo cambiar la carpeta", 4000); return; }
+  renderExportDir(d);
+  if (!d.cancelled) toast(`Los finales se guardarán en «${folderName(d.path)}»`, 3500);
+  refreshHome();
+}
+
 // ---------------------------------------------------------------- ajustes: mi estilo de color
 const ST = { timer: null };
 async function openSettings() {
+  loadExportDir();
   renderStyle(await (await api("/api/style")).json());
   $("#settingsModal").classList.remove("hidden");
 }
@@ -1501,6 +1531,13 @@ async function uploadStyle(files, dest) {
 function initSettings() {
   $("#btnSettings").onclick = openSettings;
   $("#setClose").onclick = () => $("#settingsModal").classList.add("hidden");
+  $("#setExChoose").onclick = chooseExportDir;
+  $("#setExOpen").onclick = () => api("/api/open-exports", { method: "POST" });
+  $("#setExReset").onclick = async () => {
+    renderExportDir(await (await api("/api/export-dir/reset", { method: "POST" })).json());
+    toast("Los finales vuelven a «videos subir»", 3000);
+    refreshHome();
+  };
   document.querySelectorAll("#settingsModal .drop-zone").forEach((dz) => {
     const inp = dz.querySelector("input");
     inp.onchange = () => { uploadStyle(inp.files, dz.dataset.dest); inp.value = ""; };
@@ -1625,8 +1662,9 @@ function renderHome() {
   fin.innerHTML = d.finals.latest.length
     ? d.finals.latest.map((f) => `<div class="final"><span class="dot"></span><span class="nm">${esc(f.name)}</span>
         <span class="hint">${fmtSize(f.bytes)} · ${ago(f.mtime)}</span></div>`).join("") +
-      (d.finals.count > d.finals.latest.length ? `<div class="more">y ${plural(d.finals.count - d.finals.latest.length, "más", "más")} en <b>videos subir/</b></div>` : "")
+      (d.finals.count > d.finals.latest.length ? `<div class="more">y ${plural(d.finals.count - d.finals.latest.length, "más", "más")} en <b title="${esc(d.export_dir || "")}">${esc(folderName(d.export_dir) || "videos subir")}</b></div>` : "")
     : `<div class="final hint">Aún no hay finales. Cuando exportes, aparecen aquí listos para subir al banco de stock.</div>`;
+  if (d.export_dir) S.exportDir = d.export_dir;
   $("#homeVersion").textContent = `Kanu ${d.version || ""}`.trim();
 }
 

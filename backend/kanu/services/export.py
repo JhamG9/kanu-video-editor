@@ -32,17 +32,19 @@ class Exporter:
                 plan = library.cut_plan(m, s)
                 for pk in presets:
                     P = ff.PRESETS[pk]
-                    outdir = config.SUBIR if to_upload else config.EXPORT / pk
+                    outdir = config.subir_dir() if to_upload else config.EXPORT / pk
                     outdir.mkdir(parents=True, exist_ok=True)
                     for i, (a, b) in enumerate(segs):
                         suffix = f"_{i + 1:02d}" if len(segs) > 1 else ""
                         if to_upload and len(presets) > 1:  # varios formatos en la misma carpeta
                             suffix += f"_{pk}"
+                        if to_upload:
+                            suffix += config.FINAL_TAG
                         out = outdir / f"{Path(name).stem}{suffix}.{P['ext']}"
                         job = {"id": f"{time.time():.6f}-{len(self.jobs)}", "clip": name, "preset": pk,
                                "label": P["label"], "segment": i + 1, "of": len(segs), "a": a, "b": b,
                                "speed": plan[i]["speed"], "fps_raw": plan[i]["fps_raw"],
-                               "out": str(out.relative_to(config.DATA)), "status": "en cola", "progress": 0.0,
+                               "out": str(out), "status": "en cola", "progress": 0.0,
                                "error": None, "settings": dict(s), "meta": m, "audio": keep_audio}
                         self.jobs.append(job)
                         added.append(job["id"])

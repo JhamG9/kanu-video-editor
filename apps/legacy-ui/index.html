@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kanu</title>
 <link rel="icon" type="image/png" href="/static/icon.png?v=6">
-<link rel="stylesheet" href="/static/style.css?v=12">
+<link rel="stylesheet" href="/static/style.css?v=13">
 </head>
 <body>
 <header>
@@ -285,6 +285,18 @@
     <div class="modal-foot top"><h2>Ajustes</h2><div class="spacer"></div><button id="setClose" class="ghost small">Cerrar</button></div>
 
     <section class="set-sec">
+      <h3>Carpeta de exportación</h3>
+      <p class="hint">Aquí quedan los videos finales listos para subir al banco de stock (al exportar con
+        «Versión final para subir» y al terminar una tanda).</p>
+      <div class="set-exdir">
+        <div class="exdir-path" id="setExDir" title=""></div>
+        <button id="setExChoose" class="primary small">Cambiar…</button>
+        <button id="setExOpen" class="ghost small">Abrir</button>
+        <button id="setExReset" class="ghost small hidden">Usar la predeterminada</button>
+      </div>
+    </section>
+
+    <section class="set-sec">
       <h3>Mi estilo de color</h3>
       <p class="hint">Lo que mejor enseña tu estilo es <b>el original junto a tu versión editada</b> (mismo nombre):
         Kanu ve exactamente qué cambiaste. Si solo tienes los editados, súbelos igual: Kanu toma lo que se repite
@@ -359,7 +371,8 @@
         <div id="exPresets" class="ex-list"></div>
         <label class="check"><input type="checkbox" id="exAudio"> Incluir audio</label>
         <label class="check"><input type="checkbox" id="exUpload" checked> Versión final para subir</label>
-        <p class="hint">Marcado: se guardan en <b>videos subir/</b> con el nombre del clip (C0253.mp4).<br>Sin marcar: pruebas en <b>Exportados/&lt;formato&gt;/</b>. Los originales no se tocan.</p>
+        <p class="hint">Marcado: se guardan en <b id="exDirName">videos subir</b> con el nombre del clip (C0253.mp4).
+          <a href="#" id="exDirChange">Cambiar carpeta</a><br>Sin marcar: pruebas en <b>Exportados/&lt;formato&gt;/</b>. Los originales no se tocan.</p>
       </div>
     </div>
     <div class="modal-foot">
@@ -417,6 +430,6 @@
   <div class="ac-bar"><div id="acBar"></div></div>
   <div id="acNote" class="ac-note"></div>
 </div>
-<script src="/static/app.js?v=13"></script>
+<script src="/static/app.js?v=14"></script>
 </body>
 </html>

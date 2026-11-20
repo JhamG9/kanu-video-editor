@@ -1,6 +1,7 @@
 """Exportación, cola de trabajos y espacio en disco."""
 import subprocess
 import sys
+from pathlib import Path
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
@@ -52,7 +53,51 @@ def cache_clean():
 
 @router.post("/open-exports")
 def open_exports():
-    folder = config.SUBIR if config.SUBIR.exists() else config.EXPORT
+    folder = config.subir_dir()
+    if not folder.exists():
+        folder = folder if config.prefs().get("export_dir") else config.EXPORT
+    folder.mkdir(parents=True, exist_ok=True)
     opener = {"darwin": "open", "win32": "explorer"}.get(sys.platform, "xdg-open")
     subprocess.run([opener, str(folder)])
     return {"ok": True}
+
+
+def _export_dir_info():
+    return {"path": str(config.subir_dir()), "default": str(config.SUBIR),
+            "custom": bool(config.prefs().get("export_dir"))}
+
+
+@router.get("/export-dir")
+def export_dir():
+    return _export_dir_info()
+
+
+@router.post("/export-dir/choose")
+def export_dir_choose():
+    """Abre el selector de carpetas de macOS y guarda la elegida como carpeta de exportación."""
+    if sys.platform != "darwin":
+        return JSONResponse({"error": "El selector de carpetas solo está disponible en Mac"}, status_code=400)
+    start = config.subir_dir() if config.subir_dir().exists() else Path.home()
+    script = ['-e', 'activate',
+              '-e', f'set f to choose folder with prompt "Carpeta donde Kanu guarda los videos exportados" '
+                    f'default location (POSIX file "{start}")',
+              '-e', 'POSIX path of f']
+    r = subprocess.run(["osascript", *script], capture_output=True, text=True)
+    if r.returncode != 0:                      # el usuario canceló
+        return {**_export_dir_info(), "cancelled": True}
+    folder = Path(r.stdout.strip()).expanduser()
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        probe = folder / ".kanu_prueba"
+        probe.write_text("ok")
+        probe.unlink()
+    except OSError:
+        return JSONResponse({"error": f"No puedo escribir en {folder}"}, status_code=400)
+    config.set_pref("export_dir", None if folder.resolve() == config.SUBIR.resolve() else str(folder))
+    return _export_dir_info()
+
+
+@router.post("/export-dir/reset")
+def export_dir_reset():
+    config.set_pref("export_dir", None)
+    return _export_dir_info()
