@@ -511,3 +511,8 @@ button.glass small { color: var(--tx2); font-weight: 400; }
 @media (prefers-reduced-motion: reduce) { .ac-spin { animation: none; } .auto-card { animation: none; } }
 #btnApprove.on { background: rgba(111, 207, 139, .16); border-color: #3f8f5a; color: #8be0a4; }
 #btnApprove.on:hover { background: rgba(207, 111, 111, .12); border-color: #8f3f3f; color: #e09a9a; }
+
+/* Como una app de escritorio: doble clic no selecciona texto (sí se puede escribir y seleccionar en los campos) */
+html, body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+input, textarea, select, [contenteditable="true"] { -webkit-user-select: text; user-select: text; }
+img, canvas, svg { -webkit-user-drag: none; }
