@@ -302,8 +302,7 @@ async function selectClip(name) {
   const r = await api(`/api/clip?clip=${encodeURIComponent(name)}`);
   applyInfo(await r.json(), true);
   renderHist();
-  S.t = Math.min(S.t, S.info.meta.duration - 0.1);
-  if (!S.t || S.t > S.info.meta.duration) S.t = S.info.meta.duration * 0.4;
+  S.t = S.settings.trim_in || 0;                       // cada clip empieza desde el inicio (o su punto de entrada)
   renderClipList();
   await Promise.all([loadFrame(), refreshLut()]);
   if (S.noiseOpen) loadCrops();
