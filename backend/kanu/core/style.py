@@ -32,9 +32,9 @@ VIDEO_EXT = cfg.VIDEO_EXT
 
 # rango de búsqueda de cada control
 RANGES = {"exposure": (-1.5, 1.5, 0.4), "contrast": (-50, 60, 16), "highlights": (-100, 60, 24),
-          "shadows": (-60, 100, 24), "whites": (-60, 60, 16), "blacks": (-80, 80, 20),
-          "temperature": (-40, 40, 10), "tint": (-30, 30, 8), "vibrance": (-30, 60, 14),
-          "saturation": (-40, 40, 10)}
+          "shadows": (-60, 100, 24), "whites": (-60, 60, 16), "blacks": (-100, 80, 20),
+          "temperature": (-80, 80, 10), "tint": (-60, 60, 8), "vibrance": (-30, 100, 14),
+          "saturation": (-40, 80, 10)}
 QS = [2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 98]
 LUMA = np.array([0.2126, 0.7152, 0.0722])
 
@@ -119,7 +119,7 @@ def _frames(path, meta, times, knee=True):
 
 
 def _thumbs(path, fps=1):
-    raw = ff.run([config.FFMPEG, "-v", "error", "-i", str(path), "-vf", f"fps={fps},scale=32:18,format=gray",
+    raw = ff.run([cfg.FFMPEG, "-v", "error", "-i", str(path), "-vf", f"fps={fps},scale=32:18,format=gray",
                      "-f", "rawvideo", "-"]).stdout
     a = np.frombuffer(raw, np.uint8).reshape(-1, 18 * 32).astype(np.float32)
     a = (a - a.mean(1, keepdims=True)) / (a.std(1, keepdims=True) + 1e-3)   # sin depender del color/brillo
@@ -127,14 +127,23 @@ def _thumbs(path, fps=1):
 
 
 def _align(orig, edit, mo, me):
-    """Desfase (s) del editado dentro del original, por si lo recortaste."""
+    """(desfase en s, velocidad) del editado dentro del original: por si lo recortaste o lo pusiste
+    en cámara lenta. Momento t del editado = momento off + t * speed del original."""
     if abs(mo["duration"] - me["duration"]) < 1.0:
-        return 0.0
-    a, b = _thumbs(orig), _thumbs(edit)
-    if len(b) == 0 or len(a) < len(b):
-        return 0.0
-    best = min(range(len(a) - len(b) + 1), key=lambda o: float(np.mean((a[o:o + len(b)] - b) ** 2)))
-    return float(best)
+        return 0.0, 1.0
+    a = _thumbs(orig, fps=4)
+    b0 = _thumbs(edit, fps=4)
+    best = (np.inf, 0.0, 1.0)
+    for speed in (1.0, 0.95, 0.9, 0.85, 0.8, 0.75, 0.67, 0.6, 0.5):   # lento: el editado dura más
+        idx = np.round(np.arange(len(b0)) * speed).astype(int)        # fotograma del original que toca
+        n = int(idx[-1]) + 1 if len(idx) else 0
+        if n == 0 or n > len(a):
+            continue
+        for o in range(len(a) - n + 1):
+            err = float(np.mean((a[o + idx] - b0) ** 2))
+            if err < best[0]:
+                best = (err, o / 4, speed)
+    return best[1], best[2]
 
 
 def describe(px):
@@ -255,14 +264,14 @@ def _learn(ps):
             o = ORIG / p["original"]
             try:
                 mo, me = ff.probe(o), ff.probe(e)
-                off = _align(o, e, mo, me)
-                d = min(me["duration"], mo["duration"] - off)
+                off, speed = _align(o, e, mo, me)
+                d = min(me["duration"], (mo["duration"] - off) / speed)
                 times_e = [d * f for f in (0.1, 0.25, 0.4, 0.55, 0.7, 0.85)]
-                src = _frames(o, mo, [t + off for t in times_e], knee=True)
+                src = _frames(o, mo, [off + t * speed for t in times_e], knee=True)
                 dst = _frames(e, me, times_e, knee=False)
                 params, loss = fit_pair(src, dst)
                 out.append({"name": p["name"], "features": scene_features(src), "params": params,
-                            "loss": round(loss, 5), "offset": off})
+                            "loss": round(loss, 5), "offset": off, "speed": speed})
             except Exception as ex:  # noqa
                 out.append({"name": p["name"], "error": str(ex)[-200:]})
         DIR.mkdir(exist_ok=True)
